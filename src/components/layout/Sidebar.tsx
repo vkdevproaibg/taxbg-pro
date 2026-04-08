@@ -5,7 +5,6 @@ import {
   Wallet, Users,
   CalendarDays,
   Scale, Bot,
-  Settings,
 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 
@@ -57,12 +56,6 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/assistant', icon: Bot,   key: 'nav_assistant' },
     ],
   },
-  {
-    label: 'Система',
-    items: [
-      { to: '/settings', icon: Settings, key: 'nav_settings' },
-    ],
-  },
 ]
 
 export default function Sidebar() {
@@ -70,7 +63,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="sticky top-0 flex h-screen w-56 flex-col overflow-hidden"
+      className="flex h-full w-56 flex-col overflow-hidden"
       style={{ backgroundColor: 'var(--surface-sidebar)' }}
     >
 
