@@ -61,16 +61,21 @@ src/components/ui/Alert.tsx
 src/components/ui/Badge.tsx
 src/components/ui/BreakdownRow.tsx
 src/components/ui/MetricCard.tsx
+src/constants/calendar-events.ts
 src/constants/deadlines.ts
 src/constants/nap-schemas.ts
 src/constants/tax-rates-2025.ts
 src/constants/tax-rates-2026.ts
+src/hooks/useAuth.ts
 src/index.css
 src/lib/auditor.ts
+src/lib/calendarUtils.ts
 src/lib/csvExport.ts
 src/lib/i18n.ts
+src/lib/legislationMonitor.ts
 src/lib/llm.ts
 src/lib/llmCatalog.ts
+src/lib/obrazec1.ts
 src/lib/pdfGenerator.ts
 src/lib/platformImport.ts
 src/lib/supabase.ts
@@ -90,6 +95,9 @@ src/modules/calculator/index.tsx
 src/modules/calculator/types.ts
 src/modules/calculator/useCalculator.ts
 src/modules/calculator/useDividend.ts
+src/modules/calendar/EventCard.tsx
+src/modules/calendar/MonthView.tsx
+src/modules/calendar/YearView.tsx
 src/modules/deadlines/DeadlineGuide.tsx
 src/modules/onboarding/index.tsx
 src/modules/platforms/ImportPlatform.tsx
@@ -105,14 +113,18 @@ src/modules/salary/index.tsx
 src/modules/salary/useSalary.ts
 src/pages/Accounting.tsx
 src/pages/Assistant.tsx
+src/pages/Auth.tsx
 src/pages/Calculator.tsx
+src/pages/Calendar.tsx
 src/pages/Dashboard.tsx
+src/pages/Employees.tsx
 src/pages/Platforms.tsx
 src/pages/Reports.tsx
 src/pages/Salary.tsx
 src/pages/Settings.tsx
 src/store/accountingStore.ts
 src/store/calculatorStore.ts
+src/store/employeesStore.ts
 src/store/userStore.ts
 tsconfig.app.json
 tsconfig.json
@@ -122,6 +134,1091 @@ vite.config.ts
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/constants/calendar-events.ts">
+import type { LegalForm } from '../store/userStore'
+
+export type EventCategory =
+  | 'vat'
+  | 'corporate'
+  | 'social'
+  | 'statistical'
+  | 'registry'
+  | 'kep'
+  | 'salary'
+  | 'advance'
+  | 'other'
+
+export type EventRecurrence = 'monthly' | 'annual' | 'quarterly' | 'once'
+
+export interface CalendarEvent {
+  id: string
+  title_ru: string
+  title_bg: string
+  description_ru: string
+  authority: string
+  category: EventCategory
+  recurrence: EventRecurrence
+  dayOfMonth?: number
+  month?: number
+  day?: number
+  forms: LegalForm[]
+  penaltyInfo_ru: string
+  penaltyAmount?: string
+  links: { label: string; url: string }[]
+  // Legislation tracking
+  legalBasis: string
+  dv: string
+  publishedAt: string
+  effectiveFrom: string
+  effectiveTo: string | null
+  version: string
+  lastVerified: string
+}
+
+export const CALENDAR_EVENTS_2026: CalendarEvent[] = [
+  {
+    id: 'dds-monthly',
+    title_ru: 'Декларация по ДДС',
+    title_bg: 'Справка-декларация по ЗДДС',
+    description_ru: 'Ежемесячная декларация по НДС за предыдущий месяц. Дневники покупок и продаж. Подаётся онлайн через e-services.nap.bg с КЕП.',
+    authority: 'НАП',
+    category: 'vat',
+    recurrence: 'monthly',
+    dayOfMonth: 14,
+    forms: ['ood', 'et'],
+    penaltyInfo_ru: 'Штраф до 5 000 € за просрочку · лишение ДДС регистрации при повторном нарушении',
+    penaltyAmount: 'до 5 000 €',
+    links: [
+      { label: 'e-services.nap.bg', url: 'https://e-services.nap.bg' },
+      { label: 'ЗДДС чл. 125', url: 'https://nap.bg/page?id=392' },
+    ],
+    legalBasis: 'ЗДДС чл. 125',
+    dv: 'ДВ бр. 104/2025',
+    publishedAt: '2025-12-15',
+    effectiveFrom: '2026-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'osig-employees-monthly',
+    title_ru: 'Осигуровки за служители (Образец 1)',
+    title_bg: 'Осигурителни вноски за служители',
+    description_ru: 'Декларация Образец 1 и уплата осигуровок за всех сотрудников за предыдущий месяц.',
+    authority: 'НАП',
+    category: 'social',
+    recurrence: 'monthly',
+    dayOfMonth: 25,
+    forms: ['ood', 'et'],
+    penaltyInfo_ru: 'Пеня 0.03% в день от суммы задолженности',
+    penaltyAmount: '0.03%/день',
+    links: [{ label: 'inetdec.nra.bg', url: 'https://inetdec.nra.bg' }],
+    legalBasis: 'КСО чл. 7',
+    dv: 'ДВ бр. 104/2025',
+    publishedAt: '2025-12-15',
+    effectiveFrom: '2026-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'osig-self-monthly',
+    title_ru: 'Осигуровки самоосигуряващ',
+    title_bg: 'Осигурителни вноски самоосигуряващ се',
+    description_ru: 'Ежемесячная уплата осигуровок за себя: ДОО + УПФ + ЗО (+ ОЗМ по избор).',
+    authority: 'НАП',
+    category: 'social',
+    recurrence: 'monthly',
+    dayOfMonth: 25,
+    forms: ['self', 'et'],
+    penaltyInfo_ru: 'Пеня 0.03% в день',
+    penaltyAmount: '0.03%/день',
+    links: [{ label: 'e-services.nap.bg', url: 'https://e-services.nap.bg' }],
+    legalBasis: 'КСО чл. 6',
+    dv: 'ДВ бр. 104/2025',
+    publishedAt: '2025-12-15',
+    effectiveFrom: '2026-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'salary-monthly',
+    title_ru: 'Выплата зарплаты',
+    title_bg: 'Изплащане на заплати',
+    description_ru: 'Законодательно установленный срок выплаты зарплаты — не позднее последнего числа месяца, если иное не предусмотрено трудовым договором.',
+    authority: 'НАП',
+    category: 'salary',
+    recurrence: 'monthly',
+    dayOfMonth: 28,
+    forms: ['ood', 'et'],
+    penaltyInfo_ru: 'Административная ответственность по КТ · штраф 1 500–15 000 €',
+    penaltyAmount: '1 500–15 000 €',
+    links: [],
+    legalBasis: 'КТ чл. 270',
+    dv: 'ДВ бр. 26/1986',
+    publishedAt: '1986-04-01',
+    effectiveFrom: '1986-04-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+
+  {
+    id: 'kep-check-annual',
+    title_ru: 'Проверка срока КЕП',
+    title_bg: 'Проверка на срока на КЕП',
+    description_ru: 'Проверьте срок действия квалифицированной электронной подписи. КЕП нужен для подачи всех онлайн-отчётов. Обновите заранее в B-Trust или Evrotrust.',
+    authority: 'НАП',
+    category: 'kep',
+    recurrence: 'annual',
+    month: 1,
+    day: 15,
+    forms: ['ood', 'et', 'self'],
+    penaltyInfo_ru: 'Без КЕП невозможна электронная подача — косвенная просрочка всех деклараций',
+    penaltyAmount: 'косвенно',
+    links: [
+      { label: 'B-Trust', url: 'https://btrust.bg' },
+      { label: 'Evrotrust', url: 'https://evrotrust.com' },
+    ],
+    legalBasis: 'ЗЕДЕУУ чл. 24',
+    dv: 'ДВ бр. 34/2001',
+    publishedAt: '2001-04-11',
+    effectiveFrom: '2001-04-11',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'spravka1-annual',
+    title_ru: 'Справка 1 — доходы сотрудников за год',
+    title_bg: 'Справка 1 — годишни доходи на служителите',
+    description_ru: 'Годовая информационная справка о доходах каждого сотрудника. Подаётся в НАП до 28 февраля.',
+    authority: 'НАП',
+    category: 'social',
+    recurrence: 'annual',
+    month: 2,
+    day: 28,
+    forms: ['ood', 'et'],
+    penaltyInfo_ru: 'Штраф 250–500 €',
+    penaltyAmount: '250–500 €',
+    links: [{ label: 'НАП', url: 'https://nap.bg' }],
+    legalBasis: 'ЗДДФЛ чл. 73',
+    dv: 'ДВ бр. 95/2006',
+    publishedAt: '2006-11-24',
+    effectiveFrom: '2007-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'nsi-annual',
+    title_ru: 'Годовой отчёт в НСИ',
+    title_bg: 'Годишен отчет в НСИ',
+    description_ru: 'Статистический отчёт о деятельности предприятия за предыдущий год. Подаётся онлайн на nsi.bg с КЕП до 31 марта. Самый часто забываемый отчёт.',
+    authority: 'НСИ',
+    category: 'statistical',
+    recurrence: 'annual',
+    month: 3,
+    day: 31,
+    forms: ['ood', 'et'],
+    penaltyInfo_ru: 'Штраф 500–2 000 € (ЗСТАТИСТИКАТА чл. 52)',
+    penaltyAmount: '500–2 000 €',
+    links: [{ label: 'nsi.bg', url: 'https://nsi.bg' }],
+    legalBasis: 'ЗСТАТИСТИКАТА чл. 20',
+    dv: 'ДВ бр. 57/1999',
+    publishedAt: '1999-06-25',
+    effectiveFrom: '1999-06-25',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'gdd-zddfl-annual',
+    title_ru: 'Годовая декларация ЗДДФЛ (ЕТ/самоосиг.)',
+    title_bg: 'Годишна данъчна декларация ЗДДФЛ',
+    description_ru: 'Годовая налоговая декларация по ЗДДФЛ для ЕТ и самоосигуряващ. Срок — 30 апреля. При подаче до 31 марта онлайн — скидка 5% от налога (до 255.65 €).',
+    authority: 'НАП',
+    category: 'corporate',
+    recurrence: 'annual',
+    month: 4,
+    day: 30,
+    forms: ['et', 'self'],
+    penaltyInfo_ru: 'Штраф 500–3 000 €',
+    penaltyAmount: '500–3 000 €',
+    links: [{ label: 'e-services.nap.bg', url: 'https://e-services.nap.bg' }],
+    legalBasis: 'ЗДДФЛ чл. 50',
+    dv: 'ДВ бр. 95/2006',
+    publishedAt: '2006-11-24',
+    effectiveFrom: '2007-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'avans-q1',
+    title_ru: 'Авансовая вноска КНП — Q1',
+    title_bg: 'Авансова вноска ЗКПО — Q1',
+    description_ru: 'Първа тримесечна авансова вноска за корпоративен данък за текущата година.',
+    authority: 'НАП',
+    category: 'advance',
+    recurrence: 'annual',
+    month: 4,
+    day: 15,
+    forms: ['ood'],
+    penaltyInfo_ru: 'Пеня при просрочке',
+    penaltyAmount: 'пеня',
+    links: [],
+    legalBasis: 'ЗКПО чл. 83',
+    dv: 'ДВ бр. 105/2006',
+    publishedAt: '2006-12-22',
+    effectiveFrom: '2007-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'zkpo-annual',
+    title_ru: 'Годовая декларация ЗКПО',
+    title_bg: 'Годишна данъчна декларация ЗКПО',
+    description_ru: 'Корпоративная налоговая декларация за прошлый год. Срок — 30 июня. При подаче до 31 марта онлайн — скидка 1% от налога (до 1 000 €).',
+    authority: 'НАП',
+    category: 'corporate',
+    recurrence: 'annual',
+    month: 6,
+    day: 30,
+    forms: ['ood'],
+    penaltyInfo_ru: 'Штраф 500–3 000 € + пеня за просрочку уплаты',
+    penaltyAmount: '500–3 000 €',
+    links: [{ label: 'e-services.nap.bg', url: 'https://e-services.nap.bg' }],
+    legalBasis: 'ЗКПО чл. 92',
+    dv: 'ДВ бр. 105/2006',
+    publishedAt: '2006-12-22',
+    effectiveFrom: '2007-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'gfo-brra-annual',
+    title_ru: 'Годовой финансовый отчёт (БРРА)',
+    title_bg: 'Годишен финансов отчет в БРРА',
+    description_ru: 'Публикация ГФО в Агенция по вписванията (brra.bg). Для малых ООД — до 30 июня. Требуется КЕП или нотариально заверенный документ.',
+    authority: 'БРРА',
+    category: 'registry',
+    recurrence: 'annual',
+    month: 6,
+    day: 30,
+    forms: ['ood'],
+    penaltyInfo_ru: 'Штраф 500–2 000 €',
+    penaltyAmount: '500–2 000 €',
+    links: [{ label: 'brra.bg', url: 'https://brra.bg' }],
+    legalBasis: 'ЗСч чл. 40',
+    dv: 'ДВ бр. 95/2015',
+    publishedAt: '2015-12-08',
+    effectiveFrom: '2016-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'avans-q2',
+    title_ru: 'Авансовая вноска КНП — Q2',
+    title_bg: 'Авансова вноска ЗКПО — Q2',
+    description_ru: 'Втора тримесечна авансова вноска за корпоративен данък.',
+    authority: 'НАП',
+    category: 'advance',
+    recurrence: 'annual',
+    month: 7,
+    day: 15,
+    forms: ['ood'],
+    penaltyInfo_ru: 'Пеня при просрочке',
+    penaltyAmount: 'пеня',
+    links: [],
+    legalBasis: 'ЗКПО чл. 83',
+    dv: 'ДВ бр. 105/2006',
+    publishedAt: '2006-12-22',
+    effectiveFrom: '2007-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+  {
+    id: 'avans-q3',
+    title_ru: 'Авансовая вноска КНП — Q3',
+    title_bg: 'Авансова вноска ЗКПО — Q3',
+    description_ru: 'Трета тримесечна авансова вноска за корпоративен данък.',
+    authority: 'НАП',
+    category: 'advance',
+    recurrence: 'annual',
+    month: 10,
+    day: 15,
+    forms: ['ood'],
+    penaltyInfo_ru: 'Пеня при просрочке',
+    penaltyAmount: 'пеня',
+    links: [],
+    legalBasis: 'ЗКПО чл. 83',
+    dv: 'ДВ бр. 105/2006',
+    publishedAt: '2006-12-22',
+    effectiveFrom: '2007-01-01',
+    effectiveTo: null,
+    version: '2026-1',
+    lastVerified: '2026-01-01',
+  },
+]
+
+export const CATEGORY_META: Record<EventCategory, {
+  label: string
+  color: string
+  bg: string
+}> = {
+  vat:         { label: 'ДДС',        color: 'text-blue-700',    bg: 'bg-blue-50 border-blue-200' },
+  corporate:   { label: 'КНП/ЗКПО',  color: 'text-violet-700',  bg: 'bg-violet-50 border-violet-200' },
+  social:      { label: 'Осигуровки', color: 'text-orange-700',  bg: 'bg-orange-50 border-orange-200' },
+  statistical: { label: 'НСИ',        color: 'text-red-700',     bg: 'bg-red-50 border-red-200' },
+  registry:    { label: 'БРРА',       color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+  kep:         { label: 'КЕП',        color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200' },
+  salary:      { label: 'Заплати',    color: 'text-cyan-700',    bg: 'bg-cyan-50 border-cyan-200' },
+  advance:     { label: 'Авансови',   color: 'text-purple-700',  bg: 'bg-purple-50 border-purple-200' },
+  other:       { label: 'Друго',      color: 'text-slate-700',   bg: 'bg-slate-50 border-slate-200' },
+}
+</file>
+
+<file path="src/lib/calendarUtils.ts">
+import {
+  eachDayOfInterval, isSameMonth, isToday,
+  format,
+} from 'date-fns'
+import { ru } from 'date-fns/locale'
+import type { CalendarEvent } from '../constants/calendar-events'
+import type { LegalForm } from '../store/userStore'
+
+export interface CalendarDay {
+  date: Date
+  isCurrentMonth: boolean
+  isToday: boolean
+  events: CalendarEvent[]
+}
+
+export interface CalendarMonth {
+  year: number
+  month: number
+  label: string
+  days: CalendarDay[]
+  events: CalendarEvent[]
+}
+
+export function isEventActive(event: CalendarEvent, date: Date): boolean {
+  const d = date.toISOString().slice(0, 10)
+  if (d < event.effectiveFrom) return false
+  if (event.effectiveTo && d > event.effectiveTo) return false
+  return true
+}
+
+export function getEventsForDate(
+  date: Date,
+  events: CalendarEvent[],
+  legalForm: LegalForm
+): CalendarEvent[] {
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+
+  return events.filter((e) => {
+    if (!e.forms.includes(legalForm)) return false
+    if (!isEventActive(e, date)) return false
+    if (e.recurrence === 'monthly' && e.dayOfMonth) {
+      return day === e.dayOfMonth
+    }
+    if ((e.recurrence === 'annual' || e.recurrence === 'quarterly') && e.month && e.day) {
+      return month === e.month && day === e.day
+    }
+    return false
+  })
+}
+
+export function buildCalendarMonth(
+  year: number,
+  month: number,
+  events: CalendarEvent[],
+  legalForm: LegalForm
+): CalendarMonth {
+  const firstDay = new Date(year, month, 1)
+
+  const startPad = (firstDay.getDay() + 6) % 7
+  const gridStart = new Date(firstDay)
+  gridStart.setDate(gridStart.getDate() - startPad)
+
+  const lastDay = new Date(year, month + 1, 0)
+  const endPad = (7 - (lastDay.getDay() + 6) % 7 - 1) % 7
+  const gridEnd = new Date(lastDay)
+  gridEnd.setDate(gridEnd.getDate() + endPad)
+
+  const allDays = eachDayOfInterval({ start: gridStart, end: gridEnd })
+
+  const days: CalendarDay[] = allDays.map((date) => ({
+    date,
+    isCurrentMonth: isSameMonth(date, firstDay),
+    isToday: isToday(date),
+    events: getEventsForDate(date, events, legalForm),
+  }))
+
+  const monthEvents = events.filter((e) => {
+    if (!e.forms.includes(legalForm)) return false
+    if (!isEventActive(e, firstDay)) return false
+    if (e.recurrence === 'monthly') return true
+    if (e.month) return e.month === month + 1
+    return false
+  })
+
+  return {
+    year, month,
+    label: format(firstDay, 'LLLL yyyy', { locale: ru }),
+    days,
+    events: monthEvents,
+  }
+}
+
+export function getUpcomingEvents(
+  events: CalendarEvent[],
+  legalForm: LegalForm,
+  daysAhead = 30
+): { event: CalendarEvent; date: Date; daysUntil: number }[] {
+  const today = new Date()
+  const result: { event: CalendarEvent; date: Date; daysUntil: number }[] = []
+
+  for (let d = 0; d <= daysAhead; d++) {
+    const date = new Date(today)
+    date.setDate(date.getDate() + d)
+    getEventsForDate(date, events, legalForm).forEach((event) => {
+      result.push({ event, date: new Date(date), daysUntil: d })
+    })
+  }
+
+  return result.sort((a, b) => a.daysUntil - b.daysUntil)
+}
+
+export function getOverdueEvents(
+  events: CalendarEvent[],
+  legalForm: LegalForm
+): { event: CalendarEvent; date: Date; daysOverdue: number }[] {
+  const today = new Date()
+  const result: { event: CalendarEvent; date: Date; daysOverdue: number }[] = []
+
+  for (let d = 1; d <= 30; d++) {
+    const date = new Date(today)
+    date.setDate(date.getDate() - d)
+    getEventsForDate(date, events, legalForm).forEach((event) => {
+      result.push({ event, date: new Date(date), daysOverdue: d })
+    })
+  }
+
+  return result.sort((a, b) => a.daysOverdue - b.daysOverdue)
+}
+</file>
+
+<file path="src/lib/legislationMonitor.ts">
+import { llmChat } from './llm'
+import type { CalendarEvent } from '../constants/calendar-events'
+
+export interface LegislationUpdate {
+  eventId: string
+  summary_ru: string
+  severity: 'info' | 'warning' | 'critical'
+  detectedAt: string
+  publishedAt?: string
+  effectiveFrom?: string
+  dvNumber?: string
+  sourceUrl?: string
+}
+
+const MONITOR_PROMPT = `Ты — юридический монитор болгарского налогового законодательства 2026 года.
+Проверь, не изменились ли следующие нормы болгарского права в 2026 году.
+Ищи изменения на официальных сайтах: nap.bg, noi.bg, nsi.bg, brra.bg, parliament.bg, dv.parliament.bg.
+
+ВАЖНО: Для каждого найденного изменения указывай:
+- Номер Държавен вестник (ДВ бр. XX/YYYY)
+- Дату публикации в ДВ (publishedAt)
+- Дату вступления в силу (effectiveFrom) — МОЖЕТ ОТЛИЧАТЬСЯ от даты публикации
+- Переходный период если есть
+
+Ответь ТОЛЬКО в формате JSON без пояснений:
+{
+  "changes": [
+    {
+      "eventId": "id нормы",
+      "changed": true,
+      "summary_ru": "краткое описание изменения на русском",
+      "severity": "info/warning/critical",
+      "publishedAt": "YYYY-MM-DD или null",
+      "effectiveFrom": "YYYY-MM-DD или null",
+      "dvNumber": "ДВ бр. XX/YYYY или null",
+      "sourceUrl": "url источника или null"
+    }
+  ]
+}
+
+Нормы для проверки:
+`
+
+export async function checkLegislationUpdates(
+  events: CalendarEvent[],
+  apiKey?: string
+): Promise<LegislationUpdate[]> {
+  const normsToCheck = events
+    .map((e) => [
+      `- id: "${e.id}"`,
+      `  норма: ${e.legalBasis}`,
+      `  ДВ: ${e.dv}`,
+      `  опубликовано: ${e.publishedAt}`,
+      `  в силе с: ${e.effectiveFrom}`,
+      `  действует до: ${e.effectiveTo ?? 'настоящего времени'}`,
+      `  версия: ${e.version}`,
+      `  проверено: ${e.lastVerified}`,
+    ].join('\n'))
+    .join('\n\n')
+
+  try {
+    const response = await llmChat(
+      [{ role: 'user', content: MONITOR_PROMPT + normsToCheck }],
+      {
+        model: 'anthropic/claude-sonnet-4-5',
+        maxTokens: 2000,
+        temperature: 0.1,
+        apiKey,
+      }
+    )
+
+    const text = response.content
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return []
+
+    const parsed = JSON.parse(jsonMatch[0])
+    const updates: LegislationUpdate[] = []
+
+    for (const change of parsed.changes ?? []) {
+      if (change.changed && change.summary_ru) {
+        updates.push({
+          eventId: change.eventId,
+          summary_ru: change.summary_ru,
+          severity: change.severity ?? 'info',
+          detectedAt: new Date().toISOString(),
+          publishedAt: change.publishedAt ?? undefined,
+          effectiveFrom: change.effectiveFrom ?? undefined,
+          dvNumber: change.dvNumber ?? undefined,
+          sourceUrl: change.sourceUrl ?? undefined,
+        })
+      }
+    }
+
+    return updates
+  } catch {
+    return []
+  }
+}
+
+const UPDATES_KEY = 'taxbg-legislation-updates'
+const LAST_CHECK_KEY = 'taxbg-legislation-last-check'
+
+export function saveLegislationUpdates(updates: LegislationUpdate[]): void {
+  localStorage.setItem(UPDATES_KEY, JSON.stringify(updates))
+  localStorage.setItem(LAST_CHECK_KEY, new Date().toISOString())
+}
+
+export function loadLegislationUpdates(): LegislationUpdate[] {
+  try {
+    const raw = localStorage.getItem(UPDATES_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+export function getLastCheckDate(): string | null {
+  return localStorage.getItem(LAST_CHECK_KEY)
+}
+
+export function shouldCheck(): boolean {
+  const last = getLastCheckDate()
+  if (!last) return true
+  return Date.now() - new Date(last).getTime() > 24 * 60 * 60 * 1000
+}
+</file>
+
+<file path="src/modules/calendar/EventCard.tsx">
+import type { CalendarEvent } from '../../constants/calendar-events'
+import { CATEGORY_META } from '../../constants/calendar-events'
+
+interface Props {
+  event: CalendarEvent
+  daysUntil?: number
+  daysOverdue?: number
+  compact?: boolean
+}
+
+export default function EventCard({ event, daysUntil, daysOverdue, compact }: Props) {
+  const meta = CATEGORY_META[event.category]
+
+  const urgencyClass =
+    daysOverdue !== undefined                             ? 'border-red-300 bg-red-50' :
+    daysUntil !== undefined && daysUntil <= 3             ? 'border-red-300 bg-red-50' :
+    daysUntil !== undefined && daysUntil <= 7             ? 'border-amber-300 bg-amber-50' :
+    daysUntil !== undefined && daysUntil <= 14            ? 'border-yellow-200 bg-yellow-50' :
+    meta.bg
+
+  if (compact) {
+    return (
+      <div className={`rounded px-1.5 py-0.5 text-xs font-medium border truncate ${urgencyClass} ${meta.color}`}>
+        {event.title_ru}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`rounded-xl border p-4 space-y-2 w-full ${urgencyClass}`}>
+      <div className="flex items-start gap-2 flex-wrap">
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium border shrink-0 ${meta.bg} ${meta.color}`}>
+          {meta.label}
+        </span>
+        <span className="text-xs text-slate-400 shrink-0">{event.authority}</span>
+        {daysOverdue !== undefined && (
+          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+            Просрочено {daysOverdue} дн.
+          </span>
+        )}
+        {daysUntil !== undefined && daysUntil <= 7 && daysUntil >= 0 && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+            Через {daysUntil === 0 ? 'сегодня' : `${daysUntil} дн.`}
+          </span>
+        )}
+      </div>
+
+      <p className="font-medium text-slate-800">{event.title_ru}</p>
+      <p className="text-xs text-slate-500 leading-relaxed">{event.description_ru}</p>
+
+      <div className="flex items-center justify-between pt-1 border-t border-slate-100 flex-wrap gap-2">
+        <span className="text-xs text-red-500">{event.penaltyInfo_ru}</span>
+        <div className="flex gap-3">
+          {event.links.map((link) => (
+            <a key={link.url} href={link.url} target="_blank" rel="noreferrer"
+              className="text-xs text-violet-500 underline hover:text-violet-700">
+              {link.label}
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <div className="text-xs text-slate-300 space-y-0.5">
+        <p>{event.legalBasis} · {event.dv}</p>
+        <p>
+          Опубликовано: {event.publishedAt}
+          {event.publishedAt !== event.effectiveFrom &&
+            ` · В силе с: ${event.effectiveFrom}`}
+          {event.effectiveTo && ` · До: ${event.effectiveTo}`}
+        </p>
+        <p>Версия {event.version} · проверено {event.lastVerified}</p>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="src/modules/calendar/MonthView.tsx">
+import type { CalendarMonth } from '../../lib/calendarUtils'
+import { CATEGORY_META } from '../../constants/calendar-events'
+
+interface Props {
+  calendar: CalendarMonth
+  onDayClick: (date: Date) => void
+  selectedDate: Date | null
+}
+
+const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+
+export default function MonthView({ calendar, onDayClick, selectedDate }: Props) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-slate-100">
+        {WEEKDAYS.map((d) => (
+          <div key={d} className="py-2 text-center text-xs font-medium text-slate-400">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7">
+        {calendar.days.map((day, i) => {
+          const isSelected = selectedDate?.toDateString() === day.date.toDateString()
+
+          return (
+            <button key={i} onClick={() => onDayClick(day.date)}
+              className={`
+                min-h-[72px] p-1.5 text-left border-b border-r border-slate-50
+                hover:bg-slate-50 transition-colors
+                ${!day.isCurrentMonth ? 'opacity-30' : ''}
+                ${day.isToday ? 'bg-violet-50' : ''}
+                ${isSelected ? 'ring-2 ring-inset ring-violet-400' : ''}
+              `}>
+              <div className={`
+                text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full
+                ${day.isToday ? 'bg-violet-600 text-white' : 'text-slate-600'}
+              `}>
+                {day.date.getDate()}
+              </div>
+              <div className="space-y-0.5">
+                {day.events.slice(0, 2).map((event) => {
+                  const meta = CATEGORY_META[event.category]
+                  return (
+                    <div key={event.id}
+                      className={`rounded px-1 py-0.5 text-xs truncate border ${meta.bg} ${meta.color}`}>
+                      {event.title_ru}
+                    </div>
+                  )
+                })}
+                {day.events.length > 2 && (
+                  <div className="text-xs text-slate-400 pl-1">
+                    +{day.events.length - 2}
+                  </div>
+                )}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="src/modules/calendar/YearView.tsx">
+import { format } from 'date-fns'
+import { ru } from 'date-fns/locale'
+import { buildCalendarMonth } from '../../lib/calendarUtils'
+import type { CalendarEvent } from '../../constants/calendar-events'
+import { CATEGORY_META } from '../../constants/calendar-events'
+import type { LegalForm } from '../../store/userStore'
+
+interface Props {
+  year: number
+  events: CalendarEvent[]
+  legalForm: LegalForm
+  onMonthClick: (month: number) => void
+}
+
+export default function YearView({ year, events, legalForm, onMonthClick }: Props) {
+  const months = Array.from({ length: 12 }, (_, i) =>
+    buildCalendarMonth(year, i, events, legalForm)
+  )
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {months.map((month, i) => (
+        <button key={i} onClick={() => onMonthClick(i)}
+          className="rounded-xl border border-slate-100 bg-white p-4 text-left shadow-sm hover:border-violet-300 transition-colors">
+          <div className="font-medium text-slate-700 capitalize mb-3">
+            {format(new Date(year, i, 1), 'LLLL', { locale: ru })}
+          </div>
+          <div className="space-y-1.5">
+            {month.events.length === 0 ? (
+              <p className="text-xs text-slate-300">Нет обязательств</p>
+            ) : (
+              month.events.slice(0, 4).map((event) => {
+                const meta = CATEGORY_META[event.category]
+                const day  = event.recurrence === 'monthly'
+                  ? `до ${event.dayOfMonth}-го`
+                  : event.day
+                    ? `${event.day}.${String(event.month).padStart(2, '0')}`
+                    : ''
+                return (
+                  <div key={event.id} className="flex items-center gap-2">
+                    <span className={`rounded px-1.5 py-0.5 text-xs font-medium border shrink-0 ${meta.bg} ${meta.color}`}>
+                      {meta.label}
+                    </span>
+                    <span className="text-xs text-slate-500 truncate flex-1">{event.title_ru}</span>
+                    <span className="text-xs text-slate-300 shrink-0">{day}</span>
+                  </div>
+                )
+              })
+            )}
+            {month.events.length > 4 && (
+              <p className="text-xs text-slate-400">+{month.events.length - 4} ещё</p>
+            )}
+          </div>
+        </button>
+      ))}
+    </div>
+  )
+}
+</file>
+
+<file path="src/pages/Calendar.tsx">
+import { useState, useEffect, useMemo } from 'react'
+import { addMonths, subMonths, format } from 'date-fns'
+import { ru } from 'date-fns/locale'
+import { useUserStore } from '../store/userStore'
+import { CALENDAR_EVENTS_2026, CATEGORY_META } from '../constants/calendar-events'
+import type { EventCategory } from '../constants/calendar-events'
+import {
+  buildCalendarMonth,
+  getUpcomingEvents,
+  getOverdueEvents,
+  getEventsForDate,
+} from '../lib/calendarUtils'
+import {
+  checkLegislationUpdates,
+  saveLegislationUpdates,
+  loadLegislationUpdates,
+  shouldCheck,
+  getLastCheckDate,
+} from '../lib/legislationMonitor'
+import MonthView  from '../modules/calendar/MonthView'
+import YearView   from '../modules/calendar/YearView'
+import EventCard  from '../modules/calendar/EventCard'
+
+type ViewMode = 'month' | 'next' | 'year'
+
+export default function Calendar() {
+  const { legalForm, llmApiKey } = useUserStore()
+
+  const [viewMode,      setViewMode]      = useState<ViewMode>('month')
+  const [currentDate,   setCurrentDate]   = useState(new Date())
+  const [selectedDate,  setSelectedDate]  = useState<Date | null>(null)
+  const [filterCat,     setFilterCat]     = useState<EventCategory | 'all'>('all')
+  const [updates,       setUpdates]       = useState(loadLegislationUpdates)
+  const [checking,      setChecking]      = useState(false)
+  const [lastCheck,     setLastCheck]     = useState(getLastCheckDate)
+
+  const year  = currentDate.getFullYear()
+  const month = currentDate.getMonth()
+
+  const filtered = useMemo(() =>
+    CALENDAR_EVENTS_2026.filter((e) =>
+      filterCat === 'all' || e.category === filterCat
+    ), [filterCat])
+
+  const calendar     = useMemo(() => buildCalendarMonth(year, month,     filtered, legalForm), [year, month,     filtered, legalForm])
+  const nextCalendar = useMemo(() => buildCalendarMonth(year, month + 1, filtered, legalForm), [year, month,     filtered, legalForm])
+  const upcoming     = useMemo(() => getUpcomingEvents(filtered, legalForm, 30),               [filtered, legalForm])
+  const overdue      = useMemo(() => getOverdueEvents(filtered, legalForm),                    [filtered, legalForm])
+
+  const selectedEvents = useMemo(() => {
+    if (!selectedDate) return []
+    return getEventsForDate(selectedDate, filtered, legalForm)
+  }, [selectedDate, filtered, legalForm])
+
+  const handleCheckLegislation = async () => {
+    setChecking(true)
+    try {
+      const found = await checkLegislationUpdates(CALENDAR_EVENTS_2026, llmApiKey || undefined)
+      saveLegislationUpdates(found)
+      setUpdates(found)
+      setLastCheck(new Date().toISOString())
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  useEffect(() => {
+    if (shouldCheck() && llmApiKey) void handleCheckLegislation()
+  }, [])
+
+  return (
+    <div className="space-y-5 p-6">
+
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Календар на отчетността</h1>
+          <p className="mt-1 text-sm text-slate-400">
+            Все дедлайны · ставки 2026 · даты публикации и вступления в силу
+          </p>
+        </div>
+        <button onClick={handleCheckLegislation} disabled={checking}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+          {checking ? '⏳ Проверка изменений...' : '🔍 Проверить законодательство'}
+        </button>
+      </div>
+
+      {/* Legislation updates banner */}
+      {updates.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+          <p className="text-sm font-semibold text-amber-800">
+            ⚠ Обнаружены изменения в законодательстве ({updates.length})
+          </p>
+          {updates.map((u) => (
+            <div key={u.eventId} className="text-xs text-amber-700 space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`rounded px-1.5 py-0.5 font-medium ${
+                  u.severity === 'critical' ? 'bg-red-100 text-red-700' :
+                  u.severity === 'warning'  ? 'bg-amber-100 text-amber-700' :
+                  'bg-blue-100 text-blue-700'
+                }`}>{u.severity}</span>
+                <span className="font-medium">{u.eventId}</span>
+                {u.dvNumber && <span className="text-amber-600">{u.dvNumber}</span>}
+              </div>
+              <p>{u.summary_ru}</p>
+              {u.publishedAt && (
+                <p className="text-amber-500">
+                  Опубликовано: {u.publishedAt}
+                  {u.effectiveFrom && u.effectiveFrom !== u.publishedAt &&
+                    ` · В силе с: ${u.effectiveFrom}`}
+                </p>
+              )}
+              {u.sourceUrl && (
+                <a href={u.sourceUrl} target="_blank" rel="noreferrer"
+                  className="underline text-amber-600">
+                  Источник →
+                </a>
+              )}
+            </div>
+          ))}
+          <button
+            onClick={() => { saveLegislationUpdates([]); setUpdates([]) }}
+            className="text-xs text-amber-500 underline">
+            Скрыть уведомления
+          </button>
+        </div>
+      )}
+
+      {/* Overdue banner */}
+      {overdue.length > 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
+          <p className="text-sm font-semibold text-red-700">
+            🚨 Просроченные обязательства ({overdue.length})
+          </p>
+          {overdue.slice(0, 3).map(({ event, daysOverdue }) => (
+            <EventCard key={event.id} event={event} daysOverdue={daysOverdue} />
+          ))}
+        </div>
+      )}
+
+      {/* Category filter */}
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => setFilterCat('all')}
+          className={`rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors ${
+            filterCat === 'all'
+              ? 'bg-slate-800 text-white border-slate-800'
+              : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}>
+          Все
+        </button>
+        {(Object.entries(CATEGORY_META) as [EventCategory, typeof CATEGORY_META[EventCategory]][]).map(([cat, meta]) => (
+          <button key={cat}
+            onClick={() => setFilterCat(cat === filterCat ? 'all' : cat)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium border transition-colors ${
+              filterCat === cat
+                ? `${meta.bg} ${meta.color}`
+                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+            }`}>
+            {meta.label}
+          </button>
+        ))}
+      </div>
+
+      {/* View tabs */}
+      <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+        {([
+          { id: 'month', label: 'Этот месяц' },
+          { id: 'next',  label: 'Следующий'  },
+          { id: 'year',  label: 'Весь год'   },
+        ] as { id: ViewMode; label: string }[]).map((v) => (
+          <button key={v.id} onClick={() => setViewMode(v.id)}
+            className={`flex-1 rounded-lg py-2 text-sm transition-colors ${
+              viewMode === v.id
+                ? 'bg-white font-medium shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Month navigation */}
+      {viewMode !== 'year' && (
+        <div className="flex items-center justify-between">
+          <button onClick={() => setCurrentDate((d) => subMonths(d, 1))}
+            className="rounded-lg border border-slate-200 px-4 py-1.5 text-sm hover:bg-slate-50">
+            ←
+          </button>
+          <span className="font-medium text-slate-700 capitalize">
+            {viewMode === 'month'
+              ? format(currentDate,            'LLLL yyyy', { locale: ru })
+              : format(addMonths(currentDate, 1), 'LLLL yyyy', { locale: ru })
+            }
+          </span>
+          <button onClick={() => setCurrentDate((d) => addMonths(d, 1))}
+            className="rounded-lg border border-slate-200 px-4 py-1.5 text-sm hover:bg-slate-50">
+            →
+          </button>
+        </div>
+      )}
+
+      {/* Views */}
+      {viewMode === 'month' && (
+        <MonthView calendar={calendar} onDayClick={setSelectedDate} selectedDate={selectedDate} />
+      )}
+      {viewMode === 'next' && (
+        <MonthView calendar={nextCalendar} onDayClick={setSelectedDate} selectedDate={selectedDate} />
+      )}
+      {viewMode === 'year' && (
+        <YearView
+          year={year}
+          events={filtered}
+          legalForm={legalForm}
+          onMonthClick={(m) => { setCurrentDate(new Date(year, m, 1)); setViewMode('month') }}
+        />
+      )}
+
+      {/* Selected day detail */}
+      {selectedDate && selectedEvents.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-medium text-slate-600">
+            {format(selectedDate, 'd MMMM yyyy', { locale: ru })}
+          </h2>
+          {selectedEvents.map((event) => (
+            <EventCard key={event.id} event={event} />
+          ))}
+        </div>
+      )}
+
+      {/* Upcoming list */}
+      <div>
+        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-400">
+          Ближайшие 30 дней
+        </h2>
+        {upcoming.length === 0 ? (
+          <p className="text-sm text-slate-400">Нет предстоящих обязательств</p>
+        ) : (
+          <div className="space-y-3">
+            {upcoming.slice(0, 10).map(({ event, date, daysUntil }) => (
+              <div key={`${event.id}-${date.toISOString()}`} className="flex gap-3">
+                <div className="min-w-[52px] rounded-lg bg-slate-50 p-2 text-center shrink-0">
+                  <div className="text-xs text-slate-400">
+                    {format(date, 'MMM', { locale: ru })}
+                  </div>
+                  <div className="text-lg font-bold text-slate-700">
+                    {format(date, 'd')}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <EventCard event={event} daysUntil={daysUntil} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      {lastCheck && (
+        <p className="text-xs text-slate-300 text-right">
+          Законодательство проверено: {new Date(lastCheck).toLocaleDateString('ru-RU')}
+        </p>
+      )}
+    </div>
+  )
+}
+</file>
 
 <file path=".env.example">
 # OpenRouter — универсальный LLM gateway
@@ -570,10 +1667,14 @@ export default defineConfig([
 <file path="src/App.tsx">
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/layout/Layout'
+import { useAuth } from './hooks/useAuth'
 import Accounting from './pages/Accounting'
 import Assistant from './pages/Assistant'
+import Auth from './pages/Auth'
 import Calculator from './pages/Calculator'
+import Calendar from './pages/Calendar'
 import Dashboard from './pages/Dashboard'
+import Employees from './pages/Employees'
 import Platforms from './pages/Platforms'
 import Reports from './pages/Reports'
 import Salary from './pages/Salary'
@@ -582,15 +1683,28 @@ import Onboarding from './modules/onboarding'
 import { useUserStore } from './store/userStore'
 
 function App() {
+  const { user, loading } = useAuth()
   const onboardingDone = useUserStore((s) => s.onboardingDone)
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-sm text-slate-400">Загрузка...</div>
+      </div>
+    )
+  }
+
+  if (!user) return <Auth />
   if (!onboardingDone) return <Onboarding />
 
   return (
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/calendar" element={<Calendar />} />
         <Route path="/calculator" element={<Calculator />} />
         <Route path="/salary" element={<Salary />} />
+        <Route path="/employees" element={<Employees />} />
         <Route path="/accounting" element={<Accounting />} />
         <Route path="/platforms" element={<Platforms />} />
         <Route path="/reports" element={<Reports />} />
@@ -633,13 +1747,15 @@ export default function Layout({ children }: PropsWithChildren) {
 
 <file path="src/components/layout/Sidebar.tsx">
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Calculator, Wallet, BookOpen, Store, FileText, Bot, Settings } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, Calculator, Wallet, Users, BookOpen, Store, FileText, Bot, Settings } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 
 const NAV_ITEMS = [
   { to: '/',           icon: LayoutDashboard, key: 'nav_dashboard' },
+  { to: '/calendar',   icon: CalendarDays,    key: 'nav_calendar' },
   { to: '/calculator', icon: Calculator,      key: 'nav_calculator' },
   { to: '/salary',     icon: Wallet,          key: 'nav_salary' },
+  { to: '/employees',  icon: Users,           key: 'nav_employees' },
   { to: '/accounting', icon: BookOpen,        key: 'nav_accounting' },
   { to: '/platforms',  icon: Store,           key: 'nav_platforms' },
   { to: '/reports',    icon: FileText,        key: 'nav_reports' },
@@ -681,10 +1797,25 @@ export default function Sidebar() {
 </file>
 
 <file path="src/components/layout/Topbar.tsx">
+import { useAuth } from '../../hooks/useAuth'
+
 export default function Topbar() {
+  const { user, signOut } = useAuth()
+
   return (
-    <header className="border-b border-slate-200 bg-white px-6 py-4">
-      <p className="text-sm text-slate-600">TaxBG Pro 2025</p>
+    <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+      <p className="text-sm text-slate-400">TaxBG Pro · 2026</p>
+      {user && (
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400">{user.email}</span>
+          <button
+            onClick={signOut}
+            className="text-xs text-slate-400 underline hover:text-slate-600"
+          >
+            Выйти
+          </button>
+        </div>
+      )}
     </header>
   )
 }
@@ -950,6 +2081,79 @@ export const TAX_RATES_2026 = {
     intangible: { value: 0.15, source: 'ЗКПО чл. 55', notes_ru: 'Нематериальные активы — 15% годовых' },
   },
 } as const
+</file>
+
+<file path="src/hooks/useAuth.ts">
+import { useEffect, useState } from 'react'
+import type { User } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
+
+const ADMIN_SESSION_KEY = 'taxbg-dev-admin-session'
+
+function buildLocalAdminUser(): User {
+  return {
+    id: 'local-admin',
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: 'admin@local.taxbg',
+    email_confirmed_at: new Date().toISOString(),
+    phone: '',
+    confirmed_at: new Date().toISOString(),
+    last_sign_in_at: new Date().toISOString(),
+    app_metadata: { provider: 'local-admin' },
+    user_metadata: { role: 'admin', local: true },
+    identities: [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_anonymous: false,
+  } as unknown as User
+}
+
+export function enableLocalAdminSession(): void {
+  localStorage.setItem(ADMIN_SESSION_KEY, '1')
+}
+
+function hasLocalAdminSession(): boolean {
+  return localStorage.getItem(ADMIN_SESSION_KEY) === '1'
+}
+
+export function useAuth() {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (hasLocalAdminSession()) {
+      setUser(buildLocalAdminUser())
+      setLoading(false)
+      return
+    }
+
+    if (!supabase) {
+      setUser(null)
+      setLoading(false)
+      return
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null)
+      setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const signOut = () => {
+    localStorage.removeItem(ADMIN_SESSION_KEY)
+    if (!supabase) return Promise.resolve({ error: null })
+    return supabase.auth.signOut()
+  }
+
+  return { user, loading, signOut }
+}
 </file>
 
 <file path="src/index.css">
@@ -1395,6 +2599,131 @@ export async function testInternetLatency(): Promise<number> {
 }
 </file>
 
+<file path="src/lib/obrazec1.ts">
+import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
+import type { Employee } from '../store/employeesStore'
+
+export interface Obrazec1Row {
+  employee: Employee
+  osigBase: number
+  dooEr: number
+  upfEr: number
+  zoEr: number
+  ozmEr: number
+  tzpbEr: number
+  bezrEr: number
+  totalEr: number
+  dooEe: number
+  upfEe: number
+  zoEe: number
+  ozmEe: number
+  bezrEe: number
+  totalEe: number
+  incomeTax: number
+  netSalary: number
+  totalCost: number
+}
+
+export interface Obrazec1Summary {
+  period: string
+  companyName: string
+  eik: string
+  rows: Obrazec1Row[]
+  totalEmployerContrib: number
+  totalEmployeeContrib: number
+  totalIncomeTax: number
+  totalNetPaid: number
+  totalCost: number
+}
+
+export function calculateObrazec1(
+  employees: Employee[],
+  period: string,
+  companyName: string,
+  eik: string
+): Obrazec1Summary {
+  const r = TAX_RATES_2026
+  const active = employees.filter(e => e.active)
+
+  const rows: Obrazec1Row[] = active.map(emp => {
+    const gross = emp.grossSalary
+    const osigBase = Math.min(gross, r.maxOsig.value)
+
+    const dooEr = osigBase * r.employer.doo.value
+    const upfEr = osigBase * r.employer.upf.value
+    const zoEr = osigBase * r.employer.zo.value
+    const ozmEr = osigBase * r.employer.ozm.value
+    const tzpbEr = osigBase * r.employer.tzpb.value
+    const bezrEr = osigBase * r.employer.bezr.value
+    const totalEr = dooEr + upfEr + zoEr + ozmEr + tzpbEr + bezrEr
+
+    const dooEe = osigBase * r.employee.doo.value
+    const upfEe = osigBase * r.employee.upf.value
+    const zoEe = osigBase * r.employee.zo.value
+    const ozmEe = osigBase * r.employee.ozm.value
+    const bezrEe = osigBase * r.employee.bezr.value
+    const totalEe = dooEe + upfEe + zoEe + ozmEe + bezrEe
+
+    const taxBase = Math.max(gross - totalEe, 0)
+    const incomeTax = taxBase * r.personalIncomeTax.value
+    const netSalary = gross - totalEe - incomeTax
+    const totalCost = gross + totalEr
+
+    return {
+      employee: emp, osigBase,
+      dooEr, upfEr, zoEr, ozmEr, tzpbEr, bezrEr, totalEr,
+      dooEe, upfEe, zoEe, ozmEe, bezrEe, totalEe,
+      incomeTax, netSalary, totalCost,
+    }
+  })
+
+  return {
+    period, companyName, eik, rows,
+    totalEmployerContrib: rows.reduce((s, r) => s + r.totalEr, 0),
+    totalEmployeeContrib: rows.reduce((s, r) => s + r.totalEe, 0),
+    totalIncomeTax: rows.reduce((s, r) => s + r.incomeTax, 0),
+    totalNetPaid: rows.reduce((s, r) => s + r.netSalary, 0),
+    totalCost: rows.reduce((s, r) => s + r.totalCost, 0),
+  }
+}
+
+export function obrazec1ToCsv(summary: Obrazec1Summary): string {
+  const headers = [
+    'ЕГН', 'Имя', 'Должность', 'Брутто €', 'База осиг.',
+    'ДОО работодател', 'УПФ работодател', 'ЗО работодател',
+    'ДОО работник', 'УПФ работник', 'ЗО работник',
+    'ДДФЛ', 'Нетто €', 'Разход работодател'
+  ]
+
+  const rows = summary.rows.map(r => [
+    r.employee.egn,
+    r.employee.name,
+    r.employee.position,
+    r.employee.grossSalary.toFixed(2),
+    r.osigBase.toFixed(2),
+    r.dooEr.toFixed(2), r.upfEr.toFixed(2), r.zoEr.toFixed(2),
+    r.dooEe.toFixed(2), r.upfEe.toFixed(2), r.zoEe.toFixed(2),
+    r.incomeTax.toFixed(2),
+    r.netSalary.toFixed(2),
+    r.totalCost.toFixed(2),
+  ])
+
+  const q = (v: string) => `"${v.replace(/"/g, '""')}"`
+
+  return [
+    `# Образец 1 · ${summary.period} · ${summary.companyName} · ЕИК ${summary.eik}`,
+    headers.map(q).join(';'),
+    ...rows.map(r => r.map(q).join(';')),
+    '',
+    `# Итого`,
+    `# Осигуровки работодател: ${summary.totalEmployerContrib.toFixed(2)} €`,
+    `# Осигуровки работник: ${summary.totalEmployeeContrib.toFixed(2)} €`,
+    `# ДДФЛ удержан: ${summary.totalIncomeTax.toFixed(2)} €`,
+    `# Общий расход: ${summary.totalCost.toFixed(2)} €`,
+  ].join('\n')
+}
+</file>
+
 <file path="src/lib/pdfGenerator.ts">
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import type { DDSFormData, ZKPOFormData } from '../modules/reports/types'
@@ -1678,10 +3007,14 @@ export function parseGooglePlayCsv(text: string): ImportResult {
 <file path="src/lib/supabase.ts">
 import { createClient } from '@supabase/supabase-js'
 
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null
 </file>
 
 <file path="src/lib/useT.ts">
@@ -1693,8 +3026,10 @@ const translations = {
   ru: {
     // Nav
     nav_dashboard: 'Дашборд',
+    nav_calendar: 'Календарь отчётности',
     nav_calculator: 'Налоговый калькулятор',
     nav_salary: 'Зарплатный калькулятор',
+    nav_employees: 'Служители / Образец 1',
     nav_accounting: 'Бухгалтерия',
     nav_platforms: 'App Store / Google Play',
     nav_reports: 'Отчёты и декларации',
@@ -1759,8 +3094,10 @@ const translations = {
   },
   uk: {
     nav_dashboard: 'Дашборд',
+    nav_calendar: 'Календар звітності',
     nav_calculator: 'Податковий калькулятор',
     nav_salary: 'Зарплатний калькулятор',
+    nav_employees: 'Співробітники / Зразок 1',
     nav_accounting: 'Бухгалтерія',
     nav_platforms: 'App Store / Google Play',
     nav_reports: 'Звіти та декларації',
@@ -1819,8 +3156,10 @@ const translations = {
   },
   en: {
     nav_dashboard: 'Dashboard',
+    nav_calendar: 'Compliance Calendar',
     nav_calculator: 'Tax Calculator',
     nav_salary: 'Salary Calculator',
+    nav_employees: 'Employees / Form 1',
     nav_accounting: 'Accounting',
     nav_platforms: 'App Store / Google Play',
     nav_reports: 'Reports & Declarations',
@@ -1879,8 +3218,10 @@ const translations = {
   },
   bg: {
     nav_dashboard: 'Табло',
+    nav_calendar: 'Календар на отчетността',
     nav_calculator: 'Данъчен калкулатор',
     nav_salary: 'Заплатен калкулатор',
+    nav_employees: 'Служители / Образец 1',
     nav_accounting: 'Счетоводство',
     nav_platforms: 'App Store / Google Play',
     nav_reports: 'Отчети и декларации',
@@ -4480,6 +5821,207 @@ export default function Assistant() {
 }
 </file>
 
+<file path="src/pages/Auth.tsx">
+import { useState } from 'react'
+import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { enableLocalAdminSession } from '../hooks/useAuth'
+
+type Mode = 'login' | 'register'
+
+function mapAuthError(message: string): string {
+  const lower = message.toLowerCase()
+
+  if (lower.includes('invalid login credentials')) return 'Неверный email или пароль.'
+  if (lower.includes('email not confirmed')) return 'Email не подтвержден. Подтвердите почту в Supabase Users вручную или включите авто-подтверждение новых пользователей.'
+  if (lower.includes('user already registered')) return 'Пользователь с таким email уже зарегистрирован.'
+  if (lower.includes('password should be at least')) return 'Пароль должен быть не короче 6 символов.'
+  if (lower.includes('unable to validate email address')) return 'Некорректный формат email.'
+  if (lower.includes('email rate limit exceeded')) return 'Слишком много попыток. Попробуйте позже.'
+  if (lower.includes('signup is disabled')) return 'Регистрация отключена в настройках Supabase (Auth > Providers > Email).'
+  if (lower.includes('database error saving new user')) return 'Ошибка БД при создании пользователя. Проверьте настройки Auth и триггеры в Supabase.'
+
+  return message
+}
+
+export default function Auth() {
+  const [mode, setMode] = useState<Mode>('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  const handleAdminLogin = () => {
+    setError(null)
+    setSuccess(null)
+    enableLocalAdminSession()
+    window.location.reload()
+  }
+
+  const handleSubmit = async () => {
+    setError(null)
+    setSuccess(null)
+
+    const normalizedEmail = email.trim().toLowerCase()
+    const normalizedPassword = password.trim()
+
+    if (!normalizedEmail) {
+      setError('Введите email.')
+      return
+    }
+
+    if (normalizedPassword.length < 6) {
+      setError('Пароль должен быть не короче 6 символов.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      if (!isSupabaseConfigured || !supabase) {
+        throw new Error('Supabase не настроен: добавьте VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в .env')
+      }
+
+      if (mode === 'register') {
+        const { data, error } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password: normalizedPassword,
+          options: {
+            emailRedirectTo: window.location.origin,
+          },
+        })
+
+        if (error) {
+          // If account exists, allow immediate login path instead of hard fail UX.
+          if (error.message.toLowerCase().includes('user already registered')) {
+            const { error: loginError } = await supabase.auth.signInWithPassword({
+              email: normalizedEmail,
+              password: normalizedPassword,
+            })
+            if (!loginError) return
+          }
+          throw error
+        }
+
+        if (data.session) {
+          setSuccess('Регистрация успешна. Вы вошли в систему.')
+        } else {
+          // Some Supabase setups return no session even without explicit errors.
+          // Try password login immediately so user can proceed when confirmation is disabled.
+          const { error: loginAfterSignUpError } = await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password: normalizedPassword,
+          })
+
+          if (!loginAfterSignUpError) {
+            setSuccess('Аккаунт создан. Вы вошли в систему.')
+            return
+          }
+
+          if (loginAfterSignUpError.message.toLowerCase().includes('email not confirmed')) {
+            setSuccess('Аккаунт создан, но email не подтвержден. Подтвердите пользователя в Supabase Dashboard > Authentication > Users.')
+            return
+          }
+
+          throw loginAfterSignUpError
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password: normalizedPassword,
+        })
+        if (error) throw error
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Ошибка авторизации'
+      setError(mapAuthError(message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+      <div className="w-full max-w-sm space-y-6 rounded-2xl bg-white p-8 shadow-lg">
+        <div className="text-center">
+          <div className="mb-2 text-4xl">🇧🇬</div>
+          <h1 className="text-xl font-bold text-slate-800">TaxBG Pro</h1>
+          <p className="mt-1 text-sm text-slate-400">Налоговый учёт в Болгарии</p>
+        </div>
+
+        {!isSupabaseConfigured && (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            Supabase не настроен. Для разработки используйте локальный админ-вход ниже.
+          </p>
+        )}
+
+        <div className="flex rounded-xl bg-slate-100 p-1">
+          {(['login', 'register'] as Mode[]).map(m => (
+            <button
+              key={m}
+              onClick={() => {
+                setMode(m)
+                setError(null)
+                setSuccess(null)
+              }}
+              className={`flex-1 rounded-lg py-2 text-sm transition-colors ${
+                mode === m ? 'bg-white font-medium shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              {m === 'login' ? 'Войти' : 'Регистрация'}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs text-slate-400">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-violet-400 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-slate-400">Пароль</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-violet-400 focus:outline-none"
+            />
+          </div>
+        </div>
+
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        {success && <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-600">{success}</p>}
+
+        <button
+          onClick={handleSubmit}
+          disabled={loading || !email || !password}
+          className="w-full rounded-xl bg-violet-600 py-3 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40"
+        >
+          {loading ? '...' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+        </button>
+
+        <button
+          onClick={handleAdminLogin}
+          className="w-full rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Войти как админ (локально)
+        </button>
+
+        <p className="text-center text-xs text-slate-400">
+          Данные хранятся локально. Синхронизация между устройствами - скоро.
+        </p>
+      </div>
+    </div>
+  )
+}
+</file>
+
 <file path="src/pages/Calculator.tsx">
 import CalculatorModule from '../modules/calculator'
 
@@ -4596,6 +6138,264 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+</file>
+
+<file path="src/pages/Employees.tsx">
+import { useState } from 'react'
+import { format } from 'date-fns'
+import { useEmployeesStore } from '../store/employeesStore'
+import { useUserStore } from '../store/userStore'
+import { calculateObrazec1, obrazec1ToCsv } from '../lib/obrazec1'
+import type { Employee } from '../store/employeesStore'
+
+function EmployeeCard({ emp, onToggle, onRemove }: {
+  emp: Employee
+  onToggle: () => void
+  onRemove: () => void
+}) {
+  return (
+    <div className={`rounded-xl border p-4 ${emp.active ? 'border-slate-100 bg-white' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1">
+          <div className="font-medium text-slate-800">{emp.name}</div>
+          <div className="mt-0.5 text-xs text-slate-500">
+            {emp.position} · ЕГН: {emp.egn} · от {emp.startDate}
+          </div>
+          <div className="mt-1 text-sm font-medium text-violet-600">{emp.grossSalary.toFixed(2)} € брутто/мес</div>
+        </div>
+        <div className="shrink-0 flex gap-2">
+          <button
+            onClick={onToggle}
+            className={`rounded-lg px-3 py-1 text-xs ${emp.active ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}
+          >
+            {emp.active ? 'Активен' : 'Неактивен'}
+          </button>
+          <button onClick={onRemove} className="text-lg leading-none text-slate-300 hover:text-red-400">×</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AddEmployeeForm({ onAdd }: { onAdd: (e: Omit<Employee, 'id'>) => void }) {
+  const [name, setName] = useState('')
+  const [egn, setEgn] = useState('')
+  const [position, setPosition] = useState('')
+  const [gross, setGross] = useState('')
+  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [open, setOpen] = useState(false)
+
+  const handleAdd = () => {
+    if (!name || !egn || !gross) return
+    onAdd({ name, egn, position, grossSalary: Number(gross), startDate, active: true })
+    setName('')
+    setEgn('')
+    setPosition('')
+    setGross('')
+    setOpen(false)
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full rounded-xl border border-dashed border-slate-300 py-3 text-sm text-slate-500 transition-colors hover:border-violet-400 hover:text-violet-600"
+      >
+        + Добавить сотрудника
+      </button>
+    )
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border border-violet-200 bg-violet-50 p-5">
+      <h3 className="font-medium text-violet-800">Новый сотрудник</h3>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className="mb-1 block text-xs text-slate-500">Имя и фамилия</label>
+          <input
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Иван Иванов"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">ЕГН</label>
+          <input
+            value={egn}
+            onChange={e => setEgn(e.target.value)}
+            placeholder="8001010000"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Должность</label>
+          <input
+            value={position}
+            onChange={e => setPosition(e.target.value)}
+            placeholder="Разработчик"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Брутто зарплата (€/мес)</label>
+          <input
+            type="number"
+            value={gross}
+            onChange={e => setGross(e.target.value)}
+            placeholder="2000"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-slate-500">Дата найма</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none"
+          />
+        </div>
+      </div>
+      <div className="flex gap-3">
+        <button
+          onClick={handleAdd}
+          disabled={!name || !egn || !gross}
+          className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40"
+        >
+          Добавить
+        </button>
+        <button
+          onClick={() => setOpen(false)}
+          className="rounded-lg border border-slate-200 px-5 py-2 text-sm text-slate-600 hover:bg-slate-50"
+        >
+          Отмена
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default function Employees() {
+  const { employees, addEmployee, updateEmployee, removeEmployee } = useEmployeesStore()
+  const { companyName, eik } = useUserStore()
+  const [period, setPeriod] = useState(format(new Date(), 'yyyy-MM'))
+  const [generated, setGenerated] = useState(false)
+
+  const active = employees.filter(e => e.active)
+  const summary = calculateObrazec1(active, period, companyName, eik)
+
+  const handleDownload = () => {
+    const csv = obrazec1ToCsv(summary)
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `obrazec1_${period}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setGenerated(true)
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Служители и Образец 1</h1>
+        <p className="mt-1 text-sm text-slate-400">
+          Управление сотрудниками · ежемесячная форма до 25-го числа
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700">
+        <strong>Образец 1</strong> подаётся в НАП ежемесячно до 25-го числа за предыдущий месяц.
+        Содержит данные о всех сотрудниках: осигуровки, ДДФЛ, нетто зарплата.
+        Подаётся онлайн через <a href="https://inetdec.nra.bg" target="_blank" rel="noreferrer" className="font-medium underline">inetdec.nra.bg</a> с КЕП.
+      </div>
+
+      <div className="space-y-3">
+        {employees.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">
+            Нет сотрудников. Добавьте первого.
+          </div>
+        ) : (
+          employees.map(emp => (
+            <EmployeeCard
+              key={emp.id}
+              emp={emp}
+              onToggle={() => updateEmployee(emp.id, { active: !emp.active })}
+              onRemove={() => removeEmployee(emp.id)}
+            />
+          ))
+        )}
+        <AddEmployeeForm onAdd={addEmployee} />
+      </div>
+
+      {active.length > 0 && (
+        <div className="space-y-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+          <h2 className="font-semibold text-slate-700">Генерация Образец 1</h2>
+          <div className="flex items-end gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-slate-400">Месяц</label>
+              <input
+                type="month"
+                value={period}
+                onChange={e => setPeriod(e.target.value)}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none"
+              />
+            </div>
+            <button
+              onClick={handleDownload}
+              className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-medium text-white hover:bg-violet-700"
+            >
+              Скачать CSV
+            </button>
+            {generated && <span className="text-sm text-green-600">✓ Готово</span>}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-xs text-slate-400">
+                  <th className="pb-2 text-left font-medium">Сотрудник</th>
+                  <th className="pb-2 text-right font-medium">Брутто</th>
+                  <th className="pb-2 text-right font-medium">Осиг. работод.</th>
+                  <th className="pb-2 text-right font-medium">Осиг. работник</th>
+                  <th className="pb-2 text-right font-medium">ДДФЛ</th>
+                  <th className="pb-2 text-right font-medium">Нетто</th>
+                  <th className="pb-2 text-right font-medium">Разход</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {summary.rows.map(row => (
+                  <tr key={row.employee.id}>
+                    <td className="py-2 text-slate-700">{row.employee.name}</td>
+                    <td className="py-2 text-right text-slate-600">{row.employee.grossSalary.toFixed(2)} €</td>
+                    <td className="py-2 text-right text-red-500">{row.totalEr.toFixed(2)} €</td>
+                    <td className="py-2 text-right text-orange-500">{row.totalEe.toFixed(2)} €</td>
+                    <td className="py-2 text-right text-orange-400">{row.incomeTax.toFixed(2)} €</td>
+                    <td className="py-2 text-right font-medium text-green-600">{row.netSalary.toFixed(2)} €</td>
+                    <td className="py-2 text-right font-medium text-red-600">{row.totalCost.toFixed(2)} €</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 font-medium">
+                  <td className="pt-2 text-slate-700">Итого ({active.length} чел.)</td>
+                  <td className="pt-2 text-right">{active.reduce((s, r) => s + r.grossSalary, 0).toFixed(2)} €</td>
+                  <td className="pt-2 text-right text-red-500">{summary.totalEmployerContrib.toFixed(2)} €</td>
+                  <td className="pt-2 text-right text-orange-500">{summary.totalEmployeeContrib.toFixed(2)} €</td>
+                  <td className="pt-2 text-right text-orange-400">{summary.totalIncomeTax.toFixed(2)} €</td>
+                  <td className="pt-2 text-right text-green-600">{summary.totalNetPaid.toFixed(2)} €</td>
+                  <td className="pt-2 text-right text-red-600">{summary.totalCost.toFixed(2)} €</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -4924,6 +6724,43 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   income: 0,
   setIncome: (income) => set({ income }),
 }))
+</file>
+
+<file path="src/store/employeesStore.ts">
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+
+export interface Employee {
+  id: string
+  name: string
+  egn: string
+  position: string
+  grossSalary: number
+  startDate: string
+  active: boolean
+}
+
+interface EmployeesState {
+  employees: Employee[]
+  addEmployee: (e: Omit<Employee, 'id'>) => void
+  updateEmployee: (id: string, patch: Partial<Employee>) => void
+  removeEmployee: (id: string) => void
+}
+
+export const useEmployeesStore = create<EmployeesState>()(
+  persist(
+    (set) => ({
+      employees: [],
+      addEmployee: (e) =>
+        set((s) => ({ employees: [...s.employees, { ...e, id: crypto.randomUUID() }] })),
+      updateEmployee: (id, patch) =>
+        set((s) => ({ employees: s.employees.map((e) => e.id === id ? { ...e, ...patch } : e) })),
+      removeEmployee: (id) =>
+        set((s) => ({ employees: s.employees.filter((e) => e.id !== id) })),
+    }),
+    { name: 'taxbg-employees' }
+  )
+)
 </file>
 
 <file path="src/store/userStore.ts">

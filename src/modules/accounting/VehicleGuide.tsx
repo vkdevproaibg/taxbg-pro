@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import HelpButton from '../../components/ui/HelpButton'
 
 const RULES = [
   {
@@ -39,6 +40,7 @@ export default function VehicleGuide() {
       >
         <div className="flex items-center gap-2">
           <span>🚗</span>
+          <HelpButton topic="ЗКПО чл. 204 автомобиль на ООД расходы" title="Авто на ООД" pageContext="accounting" />
           <span className="text-sm font-medium text-amber-800">
             Автомобиль на ООД — как правильно учитывать
           </span>

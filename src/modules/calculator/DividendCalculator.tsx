@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useDividend } from './useDividend'
+import HelpButton from '../../components/ui/HelpButton'
 
 export default function DividendCalculator() {
   const [annualProfit, setAnnualProfit] = useState(50000)
@@ -19,6 +20,14 @@ export default function DividendCalculator() {
     <div className="space-y-5">
       {/* Inputs */}
       <div className="space-y-4 rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-slate-700">Дивиденты vs зарплата</h3>
+          <HelpButton
+            topic="ЗКПО чл. 247 дивиденти ЗДДФЛ чл. 38 данък дивиденти 7%"
+            title="Дивиденты и налоги"
+            pageContext="calculator"
+          />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-xs text-slate-400">Годишна печалба на ООД (€)</label>

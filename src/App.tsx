@@ -1,13 +1,15 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import { useAuth } from './hooks/useAuth'
-import { isSupabaseConfigured } from './lib/supabase'
 import Accounting from './pages/Accounting'
 import Assistant from './pages/Assistant'
+import Auditor from './pages/Auditor'
 import Auth from './pages/Auth'
 import Calculator from './pages/Calculator'
+import Calendar from './pages/Calendar'
 import Dashboard from './pages/Dashboard'
 import Employees from './pages/Employees'
+import LegalReference from './pages/LegalReference'
 import Platforms from './pages/Platforms'
 import Reports from './pages/Reports'
 import Salary from './pages/Salary'
@@ -18,18 +20,6 @@ import { useUserStore } from './store/userStore'
 function App() {
   const { user, loading } = useAuth()
   const onboardingDone = useUserStore((s) => s.onboardingDone)
-
-  if (!isSupabaseConfigured) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-        <div className="w-full max-w-xl rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
-          <h1 className="mb-2 text-base font-semibold">Supabase не настроен</h1>
-          <p className="mb-3">Добавьте переменные в файл .env в корне проекта и перезапустите dev-сервер.</p>
-          <pre className="overflow-x-auto rounded-lg bg-white/70 p-3 text-xs text-amber-900">VITE_SUPABASE_URL=https://xxx.supabase.co{`\n`}VITE_SUPABASE_ANON_KEY=eyJ...</pre>
-        </div>
-      </div>
-    )
-  }
 
   if (loading) {
     return (
@@ -46,6 +36,9 @@ function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/auditor" element={<Auditor />} />
+        <Route path="/legal" element={<LegalReference />} />
         <Route path="/calculator" element={<Calculator />} />
         <Route path="/salary" element={<Salary />} />
         <Route path="/employees" element={<Employees />} />

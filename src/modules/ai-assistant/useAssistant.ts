@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { buildAuditorReport } from '../../lib/auditor'
+import { buildAuditorSystemPrompt } from '../../lib/auditor'
 import { llmChat, TAX_SYSTEM_PROMPT, type LLMMessage } from '../../lib/llm'
 import { useUserStore } from '../../store/userStore'
+import { useAccountingStore } from '../../store/accountingStore'
+import { useEmployeesStore } from '../../store/employeesStore'
 
 export interface AssistantMessage {
   role: 'user' | 'assistant'
@@ -15,24 +17,34 @@ export function useAssistant() {
   const legalForm = useUserStore((s) => s.legalForm)
   const taxPeriod = useUserStore((s) => s.taxPeriod)
   const companyName = useUserStore((s) => s.companyName)
+  const { hasVat, hasEmployees, eik } = useUserStore()
+  const transactions = useAccountingStore((s) => s.transactions)
+  const employees = useEmployeesStore((s) => s.employees)
   const [messages, setMessages] = useState<AssistantMessage[]>([
     { role: 'assistant', content: 'Привет! Я TaxBG AI, чем помочь?' },
   ])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const auditKeyRef = useRef<string>('')
+  const auditorPromptRef = useRef<string>('')
 
   useEffect(() => {
-    const auditKey = `${legalForm}:${taxPeriod}:${companyName}`
+    const auditKey = `${legalForm}:${taxPeriod}:${companyName}:${hasVat}:${hasEmployees}:${eik}:${transactions.length}:${employees.length}`
     if (auditKeyRef.current === auditKey) return
     auditKeyRef.current = auditKey
 
-    const auditMessage = buildAuditorReport({ legalForm, taxPeriod, companyName })
-    setMessages((prev) => [
-      ...prev,
-      { role: 'assistant', content: `Режим аудитора\n${auditMessage}` },
-    ])
-  }, [companyName, legalForm, taxPeriod])
+    const auditMessage = buildAuditorSystemPrompt({
+      legalForm,
+      companyName,
+      taxPeriod,
+      hasVat: hasVat ?? false,
+      hasEmployees: hasEmployees ?? false,
+      transactions,
+      employees,
+      eik: eik ?? '',
+    })
+    auditorPromptRef.current = auditMessage
+  }, [companyName, legalForm, taxPeriod, hasVat, hasEmployees, eik, transactions, employees])
 
   const sendMessage = async (message: string) => {
     const text = message.trim()
@@ -54,7 +66,7 @@ export function useAssistant() {
       const response = await llmChat(history, {
         model: useCustomModelForChat ? llmModel : undefined,
         apiKey: llmApiKey || undefined,
-        systemPrompt: TAX_SYSTEM_PROMPT,
+        systemPrompt: `${TAX_SYSTEM_PROMPT}\n\n${auditorPromptRef.current}`,
       })
 
       setMessages((prev) => [

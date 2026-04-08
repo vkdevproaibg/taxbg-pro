@@ -1,29 +1,38 @@
 import { useState } from 'react'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
+import { enableLocalAdminSession } from '../hooks/useAuth'
 
-type Mode = 'login' | 'register'
+type Mode = 'login' | 'register' | 'reset'
 
 export default function Auth() {
-  const [mode, setMode] = useState<Mode>('login')
-  const [email, setEmail] = useState('')
+  const isDev = import.meta.env.DEV
+  const [mode,     setMode]     = useState<Mode>('login')
+  const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+  const [success,  setSuccess]  = useState<string | null>(null)
+
+  const reset = () => { setError(null); setSuccess(null) }
+
+  const handleAdminLogin = () => {
+    reset()
+    enableLocalAdminSession()
+    window.location.reload()
+  }
 
   const handleSubmit = async () => {
-    setError(null)
-    setSuccess(null)
-    setLoading(true)
+    reset(); setLoading(true)
     try {
-      if (!isSupabaseConfigured || !supabase) {
-        throw new Error('Supabase не настроен: добавьте VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в .env')
-      }
-
+      if (!supabase) throw new Error('Supabase не настроен')
       if (mode === 'register') {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
         setSuccess('Письмо с подтверждением отправлено на ' + email)
+      } else if (mode === 'reset') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email)
+        if (error) throw error
+        setSuccess('Инструкции отправлены на ' + email)
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
@@ -36,68 +45,161 @@ export default function Auth() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-sm space-y-6 rounded-2xl bg-white p-8 shadow-lg">
-        <div className="text-center">
-          <div className="mb-2 text-4xl">🇧🇬</div>
-          <h1 className="text-xl font-bold text-slate-800">TaxBG Pro</h1>
-          <p className="mt-1 text-sm text-slate-400">Налоговый учёт в Болгарии</p>
+    <div className="min-h-screen bg-folk-pattern flex items-center justify-center p-4"
+      style={{ backgroundColor: 'var(--surface)' }}>
+
+      {/* Flag stripe top */}
+      <div className="fixed top-0 left-0 right-0 h-3 bg-flag-stripe" />
+
+      <div className="w-full max-w-sm">
+        {/* Logo card */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-lg mb-4"
+            style={{ backgroundColor: 'var(--accent)' }}>
+            <span className="text-3xl">🌹</span>
+          </div>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            TaxBG Pro
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+            Данъчен учет в България · 2026
+          </p>
+          {/* Flag stripe */}
+          <div className="mt-4 mx-auto w-24 h-2 rounded-full bg-flag-stripe" />
         </div>
 
-        <div className="flex rounded-xl bg-slate-100 p-1">
-          {(['login', 'register'] as Mode[]).map(m => (
-            <button
-              key={m}
-              onClick={() => {
-                setMode(m)
-                setError(null)
-                setSuccess(null)
-              }}
-              className={`flex-1 rounded-lg py-2 text-sm transition-colors ${
-                mode === m ? 'bg-white font-medium shadow-sm' : 'text-slate-500'
-              }`}
-            >
-              {m === 'login' ? 'Войти' : 'Регистрация'}
+        {/* Auth card */}
+        <div className="rounded-2xl shadow-lg overflow-hidden"
+          style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+
+          {/* Tabs */}
+          {mode !== 'reset' && (
+            <div className="flex border-b" style={{ borderColor: 'var(--border)' }}>
+              {(['login', 'register'] as Mode[]).map((m) => (
+                <button key={m}
+                  onClick={() => { setMode(m); reset() }}
+                  className="flex-1 py-3 text-sm font-medium transition-colors"
+                  style={{
+                    color: mode === m ? 'var(--accent)' : 'var(--text-muted)',
+                    borderBottom: mode === m ? '2px solid var(--accent)' : '2px solid transparent',
+                    backgroundColor: 'transparent',
+                  }}>
+                  {m === 'login' ? 'Войти' : 'Регистрация'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="p-6 space-y-4">
+            {mode === 'reset' && (
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  Сброс пароля
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Введите email — вышлем инструкции
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium"
+                  style={{ color: 'var(--text-secondary)' }}>Email</label>
+                <input type="email" value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                  placeholder="you@example.com"
+                  className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-colors"
+                  style={{
+                    border: '1.5px solid var(--border)',
+                    backgroundColor: 'var(--surface)',
+                    color: 'var(--text-primary)',
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+                />
+              </div>
+              {mode !== 'reset' && (
+                <div>
+                  <label className="mb-1 block text-xs font-medium"
+                    style={{ color: 'var(--text-secondary)' }}>Пароль</label>
+                  <input type="password" value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-colors"
+                    style={{
+                      border: '1.5px solid var(--border)',
+                      backgroundColor: 'var(--surface)',
+                      color: 'var(--text-primary)',
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
+                    onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
+                  />
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="rounded-xl px-3 py-2 text-sm"
+                style={{ backgroundColor: 'var(--danger-light)', color: 'var(--danger-text)' }}>
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="rounded-xl px-3 py-2 text-sm"
+                style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent-text)' }}>
+                {success}
+              </div>
+            )}
+
+            <button onClick={handleSubmit}
+              disabled={loading || !email || (mode !== 'reset' && !password)}
+              className="w-full rounded-xl py-3 text-sm font-semibold text-white transition-colors disabled:opacity-40"
+              style={{ backgroundColor: 'var(--accent)' }}
+              onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--accent-dark)'}
+              onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--accent)'}>
+              {loading ? '...' :
+                mode === 'login'    ? 'Войти' :
+                mode === 'register' ? 'Создать аккаунт' : 'Отправить'}
             </button>
-          ))}
+
+            {isDev && (
+              <button
+                onClick={handleAdminLogin}
+                className="w-full rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors"
+                style={{
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-secondary)',
+                  backgroundColor: 'var(--surface)',
+                }}
+                onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--accent-light)'}
+                onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--surface)'}
+              >
+                Войти как админ (локально)
+              </button>
+            )}
+
+            <div className="flex justify-between text-xs" style={{ color: 'var(--text-muted)' }}>
+              {mode !== 'reset' ? (
+                <button onClick={() => { setMode('reset'); reset() }}
+                  className="underline hover:opacity-80">
+                  Забыли пароль?
+                </button>
+              ) : (
+                <button onClick={() => { setMode('login'); reset() }}
+                  className="underline hover:opacity-80">
+                  ← Назад к входу
+                </button>
+              )}
+              <span>🇧🇬 Болгария · 2026</span>
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs text-slate-400">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-violet-400 focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-slate-400">Пароль</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:border-violet-400 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-        {success && <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-600">{success}</p>}
-
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !email || !password}
-          className="w-full rounded-xl bg-violet-600 py-3 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40"
-        >
-          {loading ? '...' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
-        </button>
-
-        <p className="text-center text-xs text-slate-400">
-          Данные хранятся локально. Синхронизация между устройствами - скоро.
+        <p className="text-center text-xs mt-4" style={{ color: 'var(--text-muted)' }}>
+          Данные хранятся локально в вашем браузере
         </p>
       </div>
     </div>

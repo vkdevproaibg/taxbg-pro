@@ -1,12 +1,69 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+
+  /* Bulgarian national colors */
+  --bg-white: #ffffff;
+  --bg-green: #00966e;
+  --bg-red: #d62612;
+
+  /* Primary accent */
+  --accent: #00966e;
+  --accent-dark: #007a59;
+  --accent-light: #e6f4f0;
+  --accent-text: #005c44;
+
+  /* Danger */
+  --danger: #d62612;
+  --danger-dark: #b01f0e;
+  --danger-light: #fdf0ee;
+  --danger-text: #8c1a0b;
+
+  /* Neutrals */
+  --surface: #f8faf9;
+  --surface-card: #ffffff;
+  --border: #e2ece9;
+  --border-strong: #c8ddd8;
+  --text-primary: #0f2420;
+  --text-secondary: #3d5c55;
+  --text-muted: #7a9e97;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--surface);
+  color: var(--text-primary);
 }
+
+/* Bulgarian flag stripe */
+.bg-flag-stripe {
+  background: linear-gradient(
+    to right,
+    #ffffff 0% 33.3%,
+    #00966e 33.3% 66.6%,
+    #d62612 66.6% 100%
+  );
+}
+
+/* Subtle decorative folk pattern */
+.bg-folk-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cpath d='M0 20h40M20 0v40' stroke='%2300966E' stroke-width='0.5' stroke-opacity='0.15'/%3E%3Cpath d='M10 10l10-10 10 10-10 10z' stroke='%23D62612' stroke-width='0.5' stroke-opacity='0.1' fill='none'/%3E%3Cpath d='M10 30l10-10 10 10-10 10z' stroke='%23D62612' stroke-width='0.5' stroke-opacity='0.1' fill='none'/%3E%3Ccircle cx='20' cy='20' r='2' fill='%2300966E' fill-opacity='0.1'/%3E%3Ccircle cx='0' cy='0' r='2' fill='%2300966E' fill-opacity='0.1'/%3E%3Ccircle cx='40' cy='0' r='2' fill='%2300966E' fill-opacity='0.1'/%3E%3Ccircle cx='0' cy='40' r='2' fill='%2300966E' fill-opacity='0.1'/%3E%3Ccircle cx='40' cy='40' r='2' fill='%2300966E' fill-opacity='0.1'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Rose accent */
+.rose-accent::before {
+  content: "🌹";
+  margin-right: 6px;
+}
+
+* {
+  transition-property: color, background-color, border-color;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }

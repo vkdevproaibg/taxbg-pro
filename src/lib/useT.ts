@@ -6,6 +6,9 @@ const translations = {
   ru: {
     // Nav
     nav_dashboard: 'Дашборд',
+    nav_calendar: 'Данъчен календар',
+    nav_auditor: 'Аудитор',
+    nav_legal: 'Справочник законов',
     nav_calculator: 'Налоговый калькулятор',
     nav_salary: 'Зарплатный калькулятор',
     nav_employees: 'Служители / Образец 1',
@@ -73,6 +76,9 @@ const translations = {
   },
   uk: {
     nav_dashboard: 'Дашборд',
+    nav_calendar: 'Податковий календар',
+    nav_auditor: 'Аудитор',
+    nav_legal: 'Довідник законів',
     nav_calculator: 'Податковий калькулятор',
     nav_salary: 'Зарплатний калькулятор',
     nav_employees: 'Співробітники / Зразок 1',
@@ -134,6 +140,9 @@ const translations = {
   },
   en: {
     nav_dashboard: 'Dashboard',
+    nav_calendar: 'Tax Calendar',
+    nav_auditor: 'Auditor',
+    nav_legal: 'Legal Reference',
     nav_calculator: 'Tax Calculator',
     nav_salary: 'Salary Calculator',
     nav_employees: 'Employees / Form 1',
@@ -195,6 +204,9 @@ const translations = {
   },
   bg: {
     nav_dashboard: 'Табло',
+    nav_calendar: 'Данъчен календар',
+    nav_auditor: 'Одитор',
+    nav_legal: 'Наръчник на законите',
     nav_calculator: 'Данъчен калкулатор',
     nav_salary: 'Заплатен калкулатор',
     nav_employees: 'Служители / Образец 1',

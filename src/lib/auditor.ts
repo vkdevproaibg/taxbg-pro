@@ -1,68 +1,80 @@
-import { DEADLINES_2025, DEADLINES_2026, type LegalForm } from '../constants/deadlines'
-import { TAX_RATES_2025 } from '../constants/tax-rates-2025'
+import { buildAuditReport } from './riskEngine'
 import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
+import type { LegalForm } from '../store/userStore'
+import type { Transaction } from '../store/accountingStore'
+import type { Employee } from '../store/employeesStore'
 
-function parsePeriod(period: string): { year: number; month: number } {
-  const [yearStr, monthStr] = period.split('-')
-  const year = Number(yearStr) || new Date().getFullYear()
-  const month = Number(monthStr) || new Date().getMonth() + 1
-  return { year, month }
-}
+export function buildAuditorSystemPrompt(options: {
+  legalForm: LegalForm
+  companyName: string
+  taxPeriod: string
+  hasVat: boolean
+  hasEmployees: boolean
+  transactions: Transaction[]
+  employees: Employee[]
+  eik: string
+}): string {
+  const report = buildAuditReport(options)
+  const r = TAX_RATES_2026
 
-function daysUntil(date: Date): number {
-  const now = new Date()
-  const startNow = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  return Math.ceil((startDate.getTime() - startNow.getTime()) / 86400000)
+  const riskSummary = report.risks
+    .slice(0, 8)
+    .map((risk) => `[${risk.level.toUpperCase()}] ${risk.title}: ${risk.description}`)
+    .join('\n')
+
+  return `Ты - TaxBG Аудитор, опытный болгарский налоговый адвокат и бухгалтер.
+Специализация: налогообложение IT компаний и фрилансеров в Болгарии.
+Аудитория: русско- и украиноязычные IT предприниматели-релоканты.
+
+ДАННЫЕ КЛИЕНТА:
+- Компания: ${options.companyName || 'не указана'}
+- Правна форма: ${options.legalForm.toUpperCase()}
+- ЕИК: ${options.eik || 'не указан'}
+- ДДС регистрация: ${options.hasVat ? 'да' : 'нет'}
+- Есть служители: ${options.hasEmployees ? 'да' : 'нет'}
+- Период: ${options.taxPeriod}
+
+СТАВКИ 2026 (EUR):
+- КНП (корпоративен данък): ${r.corporateTax.value * 100}%
+- ДДФЛ: ${r.personalIncomeTax.value * 100}%
+- Данък дивиденти: ${r.dividendTax.value * 100}%
+- ДДС стандартен: ${r.vat.value * 100}%
+- МРЗ: ${r.minWage.value} €
+- Макс. осигурителен доход: ${r.maxOsig.value} €
+
+ТЕКУЩИЙ АУДИТ - ВЫЯВЛЕННЫЕ РИСКИ (${report.totalCount}):
+Индекс здоровья: ${report.healthScore}/100
+Критических: ${report.criticalCount} | Высоких: ${report.highCount}
+
+${riskSummary || 'Рисков не обнаружено.'}
+
+ИНСТРУКЦИИ:
+1. Отвечай как опытный болгарский адвокат - конкретно, с ссылками на законы
+2. Для каждого риска: объясни последствия, дай конкретные действия, назови сроки
+3. Упоминай штрафы только с точными суммами из болгарского законодательства
+4. Если пользователь спрашивает о теме не связанной с болгарским правом - вежливо верни разговор к налоговым вопросам
+5. При неопределенности - рекомендуй консультацию с лицензированным счетоводителем
+6. Всегда отвечай на языке пользователя`
 }
 
 export function buildAuditorReport(options: {
   legalForm: LegalForm
-  taxPeriod: string
   companyName?: string
+  taxPeriod: string
+  hasVat?: boolean
+  hasEmployees?: boolean
+  transactions?: Transaction[]
+  employees?: Employee[]
+  eik?: string
 }): string {
-  const { year, month } = parsePeriod(options.taxPeriod)
-  const deadlines = year >= 2026 ? DEADLINES_2026 : DEADLINES_2025
-  const rates = year >= 2026 ? TAX_RATES_2026 : TAX_RATES_2025
-  const periodDate = new Date(year, month - 1, 1)
-
-  const relevant = deadlines
-    .filter((d) => d.forms.includes(options.legalForm))
-    .map((d) => {
-      const targetMonth = d.isMonthly ? month : d.month
-      const date = new Date(periodDate.getFullYear(), targetMonth - 1, d.day)
-      return { d, date, delta: daysUntil(date) }
-    })
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
-
-  const overdue = relevant.filter((x) => x.delta < 0).slice(0, 3)
-  const upcoming = relevant.filter((x) => x.delta >= 0 && x.delta <= 14).slice(0, 4)
-
-  const lines: string[] = []
-  lines.push(`Аудит-режим активен (${year}-${String(month).padStart(2, '0')}).`)
-  if (options.companyName) lines.push(`Компания: ${options.companyName}.`)
-  lines.push(
-    `Ключевые ставки периода: КНП ${rates.corporateTax.value * 100}%, ДДС ${rates.vat.value * 100}%, дивидент ${rates.dividendTax.value * 100}%.`,
-  )
-
-  if (overdue.length > 0) {
-    lines.push('Отклонения/просрочки:')
-    overdue.forEach((x) => {
-      lines.push(`- ${x.d.title_ru}: просрочено на ${Math.abs(x.delta)} дн. (${x.d.penaltyInfo_ru})`)
-    })
-  } else {
-    lines.push('Просроченных обязательств по выбранному периоду не обнаружено.')
-  }
-
-  if (upcoming.length > 0) {
-    lines.push('Сделать в ближайшее время:')
-    upcoming.forEach((x) => {
-      lines.push(`- ${x.d.title_ru}: через ${x.delta} дн.`)
-    })
-  } else {
-    lines.push('На ближайшие 14 дней новых обязательств не найдено.')
-  }
-
-  lines.push('Рекомендация: проверьте первичку и банковские операции до закрытия периода.')
-  return lines.join('\n')
+  return buildAuditorSystemPrompt({
+    legalForm: options.legalForm,
+    companyName: options.companyName ?? '',
+    taxPeriod: options.taxPeriod,
+    hasVat: options.hasVat ?? false,
+    hasEmployees: options.hasEmployees ?? false,
+    transactions: options.transactions ?? [],
+    employees: options.employees ?? [],
+    eik: options.eik ?? '',
+  })
 }

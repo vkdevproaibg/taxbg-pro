@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { useAccountingStore } from '../../store/accountingStore'
 import type { TransactionType } from '../../store/accountingStore'
+import HelpButton from '../../components/ui/HelpButton'
 
 const TYPES: { value: TransactionType; label: string; hint: string; hasVat: boolean }[] = [
   { value: 'income',     label: 'Приход (B2B)',       hint: 'Плащане от фирма-клиент, без ДДС',        hasVat: false },
@@ -77,7 +78,10 @@ export default function AddTransaction() {
         </div>
 
         <div className="col-span-2">
-          <label className="mb-1 block text-xs text-slate-400">Тип</label>
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs text-slate-400">Тип</label>
+            <HelpButton topic="типове транзакции бухгалтерия ДДС осигуровки" pageContext="accounting" />
+          </div>
           <select value={type} onChange={(e) => setType(e.target.value as TransactionType)}
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none">
             {TYPES.map((t) => (

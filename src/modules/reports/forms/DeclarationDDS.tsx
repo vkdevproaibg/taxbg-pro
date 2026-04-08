@@ -3,6 +3,7 @@ import type { DDSFormData } from '../types'
 import { generateDDSXml, downloadXml } from '../../../lib/xmlGenerator'
 import { generateDDSPdf } from '../../../lib/pdfGenerator'
 import { DDS_SCHEMA } from '../../../constants/nap-schemas'
+import HelpButton from '../../../components/ui/HelpButton'
 
 interface Props {
   data: DDSFormData
@@ -67,7 +68,10 @@ export default function DeclarationDDS({ data }: Props) {
     <div className="space-y-5 rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Справка-декларация по ЗДДС</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Справка-декларация по ЗДДС</h2>
+            <HelpButton topic="ЗДДС чл. 125 декларация ДДС срок 14" title="Декларация по ДДС" pageContext="reports" size="md" />
+          </div>
           <p className="text-sm text-slate-400">
             Месечна · срок до 14-то число ·{' '}
             <span className="rounded bg-slate-100 px-1 font-mono text-xs">

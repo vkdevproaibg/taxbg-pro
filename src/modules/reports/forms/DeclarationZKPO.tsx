@@ -3,6 +3,7 @@ import type { ZKPOFormData } from '../types'
 import { generateZKPOXml, downloadXml } from '../../../lib/xmlGenerator'
 import { generateZKPOPdf } from '../../../lib/pdfGenerator'
 import { ZKPO_SCHEMA } from '../../../constants/nap-schemas'
+import HelpButton from '../../../components/ui/HelpButton'
 
 interface Props {
   data: ZKPOFormData
@@ -70,7 +71,10 @@ export default function DeclarationZKPO({ data }: Props) {
     <div className="space-y-5 rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Годишна декларация по ЗКПО</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Годишна декларация по ЗКПО</h2>
+            <HelpButton topic="ЗКПО чл. 92 годишна декларация срок 30 юни" title="Декларация ЗКПО" pageContext="reports" size="md" />
+          </div>
           <p className="text-sm text-slate-400">
             Годишна · срок 30 април · валута EUR ·{' '}
             <span className="rounded bg-slate-100 px-1 font-mono text-xs">

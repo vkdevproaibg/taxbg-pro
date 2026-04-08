@@ -4,6 +4,7 @@ import { useEmployeesStore } from '../store/employeesStore'
 import { useUserStore } from '../store/userStore'
 import { calculateObrazec1, obrazec1ToCsv } from '../lib/obrazec1'
 import type { Employee } from '../store/employeesStore'
+import HelpButton from '../components/ui/HelpButton'
 
 function EmployeeCard({ emp, onToggle, onRemove }: {
   emp: Employee
@@ -95,7 +96,14 @@ function AddEmployeeForm({ onAdd }: { onAdd: (e: Omit<Employee, 'id'>) => void }
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-slate-500">Брутто зарплата (€/мес)</label>
+          <div className="flex items-center gap-1.5">
+            <label className="mb-1 block text-xs text-slate-500">Брутто зарплата (€/мес)</label>
+            <HelpButton
+              topic="КСО чл. 7 осигуровки трудов договор работодател работник"
+              title="Осигуровки по трудовому договору"
+              pageContext="employees"
+            />
+          </div>
           <input
             type="number"
             value={gross}
