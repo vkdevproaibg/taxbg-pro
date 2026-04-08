@@ -22,18 +22,26 @@
 
   /* Neutrals */
   --surface: #f8faf9;
+  --surface-sidebar: #dde8e2;
   --surface-card: #ffffff;
   --border: #e2ece9;
   --border-strong: #c8ddd8;
   --text-primary: #0f2420;
   --text-secondary: #3d5c55;
   --text-muted: #7a9e97;
+
+  /* Surface effects */
+  --paper-tint: #f6f3eb;
+  --shadow-soft: 0 8px 24px rgba(8, 34, 28, 0.06);
+  --shadow-card: 0 10px 26px rgba(8, 34, 28, 0.08);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--surface);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.72), transparent 45%),
+    linear-gradient(180deg, var(--paper-tint) 0%, var(--surface) 55%);
   color: var(--text-primary);
 }
 
@@ -56,6 +64,40 @@ body {
 .rose-accent::before {
   content: "🌹";
   margin-right: 6px;
+}
+
+/* Reusable panel and ornament helpers for next layers */
+.panel-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-soft);
+}
+
+.embroidery-divider {
+  height: 4px;
+  border-radius: 9999px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #d62612 0 10px,
+    #ffffff 10px 14px,
+    #00966e 14px 24px,
+    #ffffff 24px 28px
+  );
+  opacity: 0.78;
+}
+
+.embroidery-band {
+  height: 12px; /* ~3mm on standard displays */
+  background-image: url('/embroidery1-stripe.jpg');
+  background-repeat: repeat-x;
+  background-size: auto 100%;
+  background-position: center;
+}
+
+.ornament-rail {
+  border-left: 3px solid #cfdecf;
+  box-shadow: inset -1px 0 0 rgba(214, 38, 18, 0.12);
 }
 
 * {

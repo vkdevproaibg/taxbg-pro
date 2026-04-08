@@ -69,26 +69,10 @@ export default function Sidebar() {
   const t = useT()
 
   return (
-    <aside className="flex h-screen w-56 flex-col border-r border-[--border] bg-[--surface-card] sticky top-0 overflow-hidden">
-
-      {/* Logo */}
-      <div className="px-4 py-5 border-b border-[--border] shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg text-white text-sm font-bold shadow-sm"
-            style={{ backgroundColor: 'var(--accent)' }}>
-            🌹
-          </div>
-          <div>
-            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              TaxBG
-            </span>
-            <span className="text-sm font-bold" style={{ color: 'var(--accent)' }}>
-              {' '}Pro
-            </span>
-          </div>
-        </div>
-        <div className="mt-3 h-1 rounded-full bg-flag-stripe opacity-80" />
-      </div>
+    <aside
+      className="sticky top-0 flex h-screen w-56 flex-col overflow-hidden"
+      style={{ backgroundColor: 'var(--surface-sidebar)' }}
+    >
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
@@ -132,10 +116,6 @@ export default function Sidebar() {
           </div>
         ))}
       </nav>
-
-      <div className="px-4 py-3 border-t border-[--border] shrink-0">
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>🇧🇬 България · 2026</p>
-      </div>
 
     </aside>
   )

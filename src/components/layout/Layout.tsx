@@ -5,11 +5,12 @@ import HelpPopover from '../ui/HelpPopover'
 
 export default function Layout({ children }: PropsWithChildren) {
   return (
-    <div className="flex min-h-screen bg-[--surface]">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
-        <main className="flex-1 overflow-auto">
+    <div className="flex min-h-screen flex-col bg-[--surface]">
+      <Topbar />
+      <div className="embroidery-band" aria-hidden="true" />
+      <div className="flex min-h-0 flex-1">
+        <Sidebar />
+        <main className="bg-folk-pattern flex-1 overflow-auto">
           {children}
         </main>
       </div>

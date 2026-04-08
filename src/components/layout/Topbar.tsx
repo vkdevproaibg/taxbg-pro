@@ -6,13 +6,28 @@ export default function Topbar() {
   const companyName = useUserStore((s) => s.companyName)
 
   return (
-    <header className="sticky top-0 z-10 border-b border-[--border] bg-[--surface-card]/95 backdrop-blur-sm">
-      <div className="h-1 bg-flag-stripe" />
-
+    <header className="sticky top-0 z-20 border-b border-[--border] bg-[--surface-card]/95 backdrop-blur-sm">
       <div className="flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white shadow-sm"
+              style={{ backgroundColor: 'var(--accent)' }}
+            >
+              🌹
+            </div>
+            <div>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                TaxBG
+              </span>
+              <span className="text-sm font-bold" style={{ color: 'var(--accent)' }}>
+                {' '}Pro
+              </span>
+            </div>
+          </div>
+
           {companyName && (
-            <span className="text-sm font-medium text-[--text-primary]">
+            <span className="ml-2 border-l border-[--border] pl-3 text-sm font-medium text-[--text-primary]">
               {companyName}
             </span>
           )}
