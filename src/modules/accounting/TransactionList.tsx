@@ -1,5 +1,12 @@
 import { useAccountingStore } from '../../store/accountingStore'
 import type { Transaction } from '../../store/accountingStore'
+import { useMemo } from 'react'
+
+interface Props {
+  filterFrom?: string
+  filterTo?: string
+  filterTypes?: string[]
+}
 
 const TYPE_META: Record<string, { label: string; color: string; income: boolean }> = {
   income:     { label: 'Приход',        color: 'bg-green-50 text-green-700',   income: true  },
@@ -57,7 +64,7 @@ function TxRow({ tx, onDelete }: { tx: Transaction; onDelete: (id: string) => vo
   )
 }
 
-export default function TransactionList() {
+export default function TransactionList({ filterFrom, filterTo, filterTypes }: Props = {}) {
   const { transactions, deleteTransaction } = useAccountingStore()
 
   if (transactions.length === 0) {
@@ -68,7 +75,13 @@ export default function TransactionList() {
     )
   }
 
-  const sorted = [...transactions].sort((a, b) => b.date.localeCompare(a.date))
+  const sorted = useMemo(() => {
+    let list = [...transactions]
+    if (filterFrom) list = list.filter((t) => t.date >= filterFrom)
+    if (filterTo) list = list.filter((t) => t.date <= filterTo)
+    if (filterTypes) list = list.filter((t) => filterTypes.includes(t.type))
+    return list.sort((a, b) => b.date.localeCompare(a.date))
+  }, [transactions, filterFrom, filterTo, filterTypes])
 
   return (
     <div className="space-y-2">

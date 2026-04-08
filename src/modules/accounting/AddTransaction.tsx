@@ -4,6 +4,11 @@ import { useAccountingStore } from '../../store/accountingStore'
 import type { TransactionType } from '../../store/accountingStore'
 import HelpButton from '../../components/ui/HelpButton'
 
+interface AddTransactionProps {
+  defaultTypes?: TransactionType[]
+  onAdd?: (txId: string) => void
+}
+
 const TYPES: { value: TransactionType; label: string; hint: string; hasVat: boolean }[] = [
   { value: 'income',     label: 'Приход (B2B)',       hint: 'Плащане от фирма-клиент, без ДДС',        hasVat: false },
   { value: 'vat_out',    label: 'Продажба с ДДС',     hint: 'Фактура с начислен ДДС 20%/9%',           hasVat: true  },
@@ -27,11 +32,15 @@ const VAT_RATES: { value: 0.20 | 0.09 | 0; label: string }[] = [
   { value: 0,    label: '0%'  },
 ]
 
-export default function AddTransaction() {
+export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionProps = {}) {
   const add = useAccountingStore((s) => s.addTransaction)
 
+  const visibleTypes = defaultTypes
+    ? TYPES.filter((t) => defaultTypes.includes(t.value))
+    : TYPES
+
   const [date, setDate]           = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [type, setType]           = useState<TransactionType>('income')
+  const [type, setType]           = useState<TransactionType>(defaultTypes ? defaultTypes[0] : 'income')
   const [description, setDesc]    = useState('')
   const [amount, setAmount]       = useState('')
   const [vatRate, setVatRate]     = useState<0.20 | 0.09 | 0>(0.20)
@@ -62,6 +71,13 @@ export default function AddTransaction() {
       municipality:      municipality.trim()   || undefined,
       deductiblePercent: showDeductible ? deductiblePct : undefined,
     })
+
+    if (onAdd) {
+      const txs = useAccountingStore.getState().transactions
+      const newest = txs[txs.length - 1]
+      if (newest) onAdd(newest.id)
+    }
+
     setDesc(''); setAmount(''); setCp(''); setInvoiceNo('')
     setAssetName(''); setMunicipality('')
   }
@@ -84,7 +100,7 @@ export default function AddTransaction() {
           </div>
           <select value={type} onChange={(e) => setType(e.target.value as TransactionType)}
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none">
-            {TYPES.map((t) => (
+            {visibleTypes.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
