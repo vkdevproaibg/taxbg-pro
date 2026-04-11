@@ -178,7 +178,8 @@ export async function createTransaction(
   tx: Transaction,
   journalEntry: JournalEntry | null,
   vatJournalEntry: JournalEntry | null,
-  companyId: string
+  companyId: string,
+  vatInputEntry: JournalEntry | null = null,
 ): Promise<{ error: string | null }> {
   if (!supabase) return { error: 'Supabase not configured' }
 
@@ -210,6 +211,14 @@ export async function createTransaction(
 
     await supabase.from('journal_batches').insert(vatBatch)
     await supabase.from('journal_lines').insert(vatLines)
+  }
+
+  if (vatInputEntry) {
+    const { batch: viBatch, lines: viLines } =
+      journalEntryToBatchAndLines(vatInputEntry, companyId)
+
+    await supabase.from('journal_batches').insert(viBatch)
+    await supabase.from('journal_lines').insert(viLines)
   }
 
   return { error: null }

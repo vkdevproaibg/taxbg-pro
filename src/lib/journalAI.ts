@@ -152,6 +152,37 @@ export function createVatJournalEntry(
   }
 }
 
+/**
+ * Creates a VAT input credit journal entry for purchases with VAT (vat_in).
+ *
+ * When a company buys goods/services with VAT and has the right to
+ * данъчен кредит (tax credit), the VAT amount is recorded as:
+ *   Дт 452 (ДДС за възстановяване / данъчен кредит)
+ *   Кт 401 (Задължения към доставчици)
+ *
+ * This mirrors createVatJournalEntry() which handles vat_out → account 451.
+ *
+ * The balance sheet calculates VAT payable as: 451 credit - 452 debit.
+ * Without this entry, 452 is never debited and VAT payable is overstated.
+ */
+export function createVatInputCreditEntry(
+  transaction: Transaction
+): Omit<JournalEntry, 'id'> | null {
+  if (transaction.type !== 'vat_in' || !transaction.vatAmount) return null
+
+  return {
+    date: transaction.date,
+    description: `Данъчен кредит ДДС: ${transaction.description}`,
+    debitAccount:  '452',   // ДДС за възстановяване (данъчен кредит)
+    creditAccount: '401',   // Задължения към доставчици
+    amount: transaction.vatAmount,
+    linkedTransactionId: transaction.id,
+    source: 'auto',
+    aiSuggested: false,
+    period: transaction.date.slice(0, 7),
+  }
+}
+
 export async function suggestJournalEntryAI(
   description: string,
   amount: number,

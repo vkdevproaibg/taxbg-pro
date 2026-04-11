@@ -16,7 +16,7 @@ import { getDateLocale } from '../lib/calendarUtils'
 import { useDataReadiness } from '../lib/dataReadiness'
 import { useAccountingStore } from '../store/accountingStore'
 import { useJournalStore } from '../store/journalStore'
-import { transactionToJournalEntry, createVatJournalEntry } from '../lib/journalAI'
+import { transactionToJournalEntry, createVatJournalEntry, createVatInputCreditEntry } from '../lib/journalAI'
 import AddTransaction from '../modules/accounting/AddTransaction'
 import TransactionList from '../modules/accounting/TransactionList'
 import ExportPanel from '../modules/accounting/ExportPanel'
@@ -363,6 +363,9 @@ function ExpenseTab() {
 
     const entry = transactionToJournalEntry(tx)
     if (entry) addEntry(entry)
+
+    const vatInputEntry = createVatInputCreditEntry(tx)
+    if (vatInputEntry) addEntry(vatInputEntry)
   }
 
   return (

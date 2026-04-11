@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { transactionToJournalEntry, createVatJournalEntry } from '../lib/journalAI'
+import { transactionToJournalEntry, createVatJournalEntry, createVatInputCreditEntry } from '../lib/journalAI'
 import { useJournalStore } from './journalStore'
 import type { JournalEntry } from './journalStore'
 
@@ -129,17 +129,21 @@ export const useAccountingStore = create<AccountingState>()(
 
         let entry: JournalEntry | null = null
         let vatEntry: JournalEntry | null = null
+        let vatInputEntry: JournalEntry | null = null
 
         if (!alreadyLinked) {
-          const rawEntry    = transactionToJournalEntry(newTx)
-          const rawVatEntry = createVatJournalEntry(newTx)
-          entry    = rawEntry    ? { ...rawEntry,    id: crypto.randomUUID() } : null
-          vatEntry = rawVatEntry ? { ...rawVatEntry, id: crypto.randomUUID() } : null
+          const rawEntry         = transactionToJournalEntry(newTx)
+          const rawVatEntry      = createVatJournalEntry(newTx)
+          const rawVatInputEntry = createVatInputCreditEntry(newTx)
+          entry         = rawEntry         ? { ...rawEntry,         id: crypto.randomUUID() } : null
+          vatEntry      = rawVatEntry      ? { ...rawVatEntry,      id: crypto.randomUUID() } : null
+          vatInputEntry = rawVatInputEntry ? { ...rawVatInputEntry, id: crypto.randomUUID() } : null
           useJournalStore.setState({
             entries: [
               ...journalState.entries,
-              ...(entry    ? [entry]    : []),
-              ...(vatEntry ? [vatEntry] : []),
+              ...(entry         ? [entry]         : []),
+              ...(vatEntry      ? [vatEntry]      : []),
+              ...(vatInputEntry ? [vatInputEntry] : []),
             ],
           })
         }
@@ -151,7 +155,7 @@ export const useAccountingStore = create<AccountingState>()(
         const companyId = newTx.companyId
         if (companyId && get().isSynced) {
           import('../lib/supabaseAccounting').then(({ createTransaction }) => {
-            createTransaction(newTx, entry, vatEntry, companyId).then(({ error }) => {
+            createTransaction(newTx, entry, vatEntry, companyId, vatInputEntry).then(({ error }) => {
               if (error) console.error('Sync addTransaction error:', error)
             })
           })
@@ -173,13 +177,15 @@ export const useAccountingStore = create<AccountingState>()(
           const filtered = journalState.entries.filter(
             (e) => e.linkedTransactionId !== id
           )
-          const rawEntry    = transactionToJournalEntry(updatedTx)
-          const rawVatEntry = createVatJournalEntry(updatedTx)
+          const rawEntry         = transactionToJournalEntry(updatedTx)
+          const rawVatEntry      = createVatJournalEntry(updatedTx)
+          const rawVatInputEntry = createVatInputCreditEntry(updatedTx)
           useJournalStore.setState({
             entries: [
               ...filtered,
-              ...(rawEntry    ? [{ ...rawEntry,    id: crypto.randomUUID() }] : []),
-              ...(rawVatEntry ? [{ ...rawVatEntry, id: crypto.randomUUID() }] : []),
+              ...(rawEntry         ? [{ ...rawEntry,         id: crypto.randomUUID() }] : []),
+              ...(rawVatEntry      ? [{ ...rawVatEntry,      id: crypto.randomUUID() }] : []),
+              ...(rawVatInputEntry ? [{ ...rawVatInputEntry, id: crypto.randomUUID() }] : []),
             ],
           })
 
@@ -233,10 +239,12 @@ export const useAccountingStore = create<AccountingState>()(
         const newEntries: JournalEntry[] = []
         for (const tx of transactions) {
           if (linkedIds.has(tx.id)) continue
-          const entry    = transactionToJournalEntry(tx)
-          const vatEntry = createVatJournalEntry(tx)
-          if (entry)    newEntries.push({ ...entry,    id: crypto.randomUUID() })
-          if (vatEntry) newEntries.push({ ...vatEntry, id: crypto.randomUUID() })
+          const entry         = transactionToJournalEntry(tx)
+          const vatEntry      = createVatJournalEntry(tx)
+          const vatInputEntry = createVatInputCreditEntry(tx)
+          if (entry)         newEntries.push({ ...entry,         id: crypto.randomUUID() })
+          if (vatEntry)      newEntries.push({ ...vatEntry,      id: crypto.randomUUID() })
+          if (vatInputEntry) newEntries.push({ ...vatInputEntry, id: crypto.randomUUID() })
         }
         if (newEntries.length > 0) {
           useJournalStore.setState({
