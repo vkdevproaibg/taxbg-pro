@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { TAX_RATES_2026 } from '../../constants/tax-rates-2026'
+import { getRateValue } from '../../lib/taxRates'
 
 export interface DividendInput {
   annualProfit: number
@@ -23,26 +23,42 @@ export interface DividendResult {
 
 export function useDividend(input: DividendInput): DividendResult {
   return useMemo(() => {
-    const r = TAX_RATES_2026
+    const rateDate = `${new Date().getFullYear()}-01-01`
     const share = input.ownerSharePct / 100
 
-    const corporateTax = Math.max(input.annualProfit, 0) * r.corporateTax.value
+    const corporateTaxRate = getRateValue('corporateTax', rateDate)
+    const dividendTaxRate  = getRateValue('dividendTax', rateDate)
+    const maxOsig          = getRateValue('maxOsig', rateDate)
+    const ddflRate         = getRateValue('personalIncomeTax', rateDate)
+
+    const eeDoo  = getRateValue('employee.doo', rateDate)
+    const eeUpf  = getRateValue('employee.upf', rateDate)
+    const eeZo   = getRateValue('employee.zo', rateDate)
+    const eeOzm  = getRateValue('employee.ozm', rateDate)
+    const eeBezr = getRateValue('employee.bezr', rateDate)
+
+    const erDoo  = getRateValue('employer.doo', rateDate)
+    const erUpf  = getRateValue('employer.upf', rateDate)
+    const erZo   = getRateValue('employer.zo', rateDate)
+    const erOzm  = getRateValue('employer.ozm', rateDate)
+    const erTzpb = getRateValue('employer.tzpb', rateDate)
+    const erBezr = getRateValue('employer.bezr', rateDate)
+
+    const corporateTax = Math.max(input.annualProfit, 0) * corporateTaxRate
     const profitAfterTax = Math.max(input.annualProfit - corporateTax, 0)
     const dividendGross = profitAfterTax * share
-    const dividendTax = dividendGross * r.dividendTax.value
+    const dividendTax = dividendGross * dividendTaxRate
     const dividendNet = dividendGross - dividendTax
 
     const gross = input.compareToSalary
-    const cap = Math.min(gross, r.maxOsig.value)
-    const eeRate = r.employee.doo.value + r.employee.upf.value + r.employee.zo.value +
-                   r.employee.ozm.value + r.employee.bezr.value
-    const erRate = r.employer.doo.value + r.employer.upf.value + r.employer.zo.value +
-                   r.employer.ozm.value + r.employer.tzpb.value + r.employer.bezr.value
+    const cap = Math.min(gross, maxOsig)
+    const eeRate = eeDoo + eeUpf + eeZo + eeOzm + eeBezr
+    const erRate = erDoo + erUpf + erZo + erOzm + erTzpb + erBezr
     const empEe = cap * eeRate
     const empEr = cap * erRate
-    const salaryNet = gross - empEe - (Math.max(gross - empEe, 0) * r.personalIncomeTax.value)
+    const salaryNet = gross - empEe - (Math.max(gross - empEe, 0) * ddflRate)
     const salaryEmployerCost = gross + empEr
-    const salaryEmployeeCost = empEe + (Math.max(gross - empEe, 0) * r.personalIncomeTax.value)
+    const salaryEmployeeCost = empEe + (Math.max(gross - empEe, 0) * ddflRate)
 
     const diff = dividendNet - salaryNet
     const recommendation: DividendResult['recommendation'] =
@@ -69,7 +85,7 @@ export function useDividend(input: DividendInput): DividendResult {
         { separator: true, label: '', amount: 0 },
         { label: 'Заплата брутто (для сравнения)', amount: gross },
         { label: `Осигуровки работник (${(eeRate * 100).toFixed(2)}%)`, amount: -empEe },
-        { label: 'ДДФЛ 10%', amount: -(Math.max(gross - empEe, 0) * r.personalIncomeTax.value) },
+        { label: 'ДДФЛ 10%', amount: -(Math.max(gross - empEe, 0) * ddflRate) },
         { label: 'ЗАПЛАТА НА РЪКА', amount: salaryNet },
       ],
     }

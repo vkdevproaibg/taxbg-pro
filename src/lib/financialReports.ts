@@ -1,6 +1,6 @@
 import type { JournalEntry } from '../store/journalStore'
 import type { Transaction } from '../store/accountingStore'
-import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
+import { getRateValue } from './taxRates'
 
 export interface OPRLine {
   code: string
@@ -56,8 +56,9 @@ export interface BalanceSheet {
 export function calculateCorporateTax(
   financialResult: number,
   nonDeductible: number = 0,
+  date: string = new Date().toISOString().slice(0, 10),
 ): { taxableProfit: number; corporateTax: number; netProfit: number } {
-  const rate = TAX_RATES_2026.corporateTax.value
+  const rate = getRateValue('corporateTax', date)
   const taxableProfit = Math.max(financialResult + nonDeductible, 0)
   const corporateTax = taxableProfit * rate
   const netProfit = financialResult - corporateTax
@@ -118,7 +119,7 @@ export function buildOPR(
     .reduce((s, t) => s + t.amount * (1 - (t.deductiblePercent ?? 0.5)), 0)
 
   const financialResult = totalRevenue - totalExpenses
-  const { taxableProfit, corporateTax, netProfit } = calculateCorporateTax(financialResult, vehicleMixed)
+  const { taxableProfit, corporateTax, netProfit } = calculateCorporateTax(financialResult, vehicleMixed, from)
   const rawTaxDue = corporateTax - advancePaid
   const taxDue    = Math.max(rawTaxDue, 0)
   const overpaid  = rawTaxDue < 0 ? Math.abs(rawTaxDue) : 0
@@ -251,7 +252,7 @@ export function buildBalanceSheet(
     .filter(t => t.date <= upToDate && t.type === 'vehicle_expense')
     .reduce((s, t) => s + t.amount * (1 - (t.deductiblePercent ?? 0.5)), 0)
 
-  const { netProfit } = calculateCorporateTax(financialResult, nonDeductible)
+  const { netProfit } = calculateCorporateTax(financialResult, nonDeductible, upToDate)
 
   const retainedEarnings = sumAccount('122', 'credit') - sumAccount('122', 'debit')
 

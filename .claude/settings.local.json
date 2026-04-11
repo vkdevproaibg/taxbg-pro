@@ -6,7 +6,8 @@
       "Bash(echo \"exit:$?\")",
       "Bash(supabase db:*)",
       "Bash(supabase link:*)",
-      "Bash(supabase status:*)"
+      "Bash(supabase status:*)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }

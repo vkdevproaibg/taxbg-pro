@@ -133,6 +133,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Initialize learning progress from Supabase
       const { useLearningStore } = await import('./learningStore')
       await useLearningStore.getState().initFromSupabase(user.id)
+
+      // Load tax rate versions (non-fatal — calculations fall back
+      // to static TAX_RATES_2026 if this fails)
+      try {
+        const { loadTaxRates } = await import('../lib/taxRates')
+        await loadTaxRates()
+      } catch (err) {
+        console.warn('[authStore] loadTaxRates failed:', err)
+      }
     }
 
     set({ isLoading: false })

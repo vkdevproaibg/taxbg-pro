@@ -1,4 +1,6 @@
-import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
+import { getRateValue } from './taxRates'
+
+const AUDIT_DATE = new Date().toISOString().slice(0, 10)
 
 // ─────────────────────────────────────────────────────────────
 // TAX RATES AUDIT SYSTEM — TaxBG Pro
@@ -32,7 +34,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'corporate_tax',
     name: 'Корпоративен данък',
-    currentValue: TAX_RATES_2026.corporateTax.value * 100,
+    currentValue: getRateValue('corporateTax', AUDIT_DATE) * 100,
     expectedValue: 10,
     unit: '%',
     legalSource: 'ЗКПО чл. 20',
@@ -45,7 +47,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'personal_income_tax',
     name: 'ДДФЛ (физически лица)',
-    currentValue: TAX_RATES_2026.personalIncomeTax.value * 100,
+    currentValue: getRateValue('personalIncomeTax', AUDIT_DATE) * 100,
     expectedValue: 10,
     unit: '%',
     legalSource: 'ЗДДФЛ чл. 48',
@@ -58,7 +60,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'dividend_tax',
     name: 'Данък дивиденти',
-    currentValue: TAX_RATES_2026.dividendTax.value * 100,
+    currentValue: getRateValue('dividendTax', AUDIT_DATE) * 100,
     expectedValue: 5,
     unit: '%',
     legalSource: 'ЗДДФЛ чл. 38 ал. 2',
@@ -71,7 +73,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'vat_standard',
     name: 'ДДС стандартна ставка',
-    currentValue: TAX_RATES_2026.vat.value * 100,
+    currentValue: getRateValue('vat', AUDIT_DATE) * 100,
     expectedValue: 20,
     unit: '%',
     legalSource: 'ЗДДС чл. 66 ал. 1',
@@ -84,7 +86,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'vat_hospitality',
     name: 'ДДС хотели и ресторанти',
-    currentValue: TAX_RATES_2026.vatHospitality.value * 100,
+    currentValue: getRateValue('vatHospitality', AUDIT_DATE) * 100,
     expectedValue: 9,
     unit: '%',
     legalSource: 'ЗДДС чл. 66 ал. 2',
@@ -97,7 +99,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'vat_threshold',
     name: 'Праг за задължителна ДДС регистрация',
-    currentValue: TAX_RATES_2026.vatThreshold.value,
+    currentValue: getRateValue('vatThreshold', AUDIT_DATE),
     expectedValue: 51130,
     unit: '€',
     legalSource: 'ЗДДС чл. 96 ал. 1',
@@ -110,7 +112,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'min_wage',
     name: 'Минимална работна заплата (МРЗ)',
-    currentValue: TAX_RATES_2026.minWage.value,
+    currentValue: getRateValue('minWage', AUDIT_DATE),
     expectedValue: 620.20,
     unit: '€/мес',
     legalSource: 'ПМС № 40/2026',
@@ -123,7 +125,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'min_osig',
     name: 'Минимален осигурителен доход (самоосигуряващ)',
-    currentValue: TAX_RATES_2026.minOsig.value,
+    currentValue: getRateValue('minOsig', AUDIT_DATE),
     expectedValue: 620.20,
     unit: '€/мес',
     legalSource: 'ЗБДОО 2026 Приложение 2',
@@ -136,7 +138,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'max_osig',
     name: 'Максимален осигурителен доход',
-    currentValue: TAX_RATES_2026.maxOsig.value,
+    currentValue: getRateValue('maxOsig', AUDIT_DATE),
     expectedValue: 2111.64,
     unit: '€/мес',
     legalSource: 'ЗБДОО 2026 чл. 9',
@@ -149,7 +151,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'employer_doo',
     name: 'ДОО — работодател',
-    currentValue: TAX_RATES_2026.employer.doo.value * 100,
+    currentValue: getRateValue('employer.doo', AUDIT_DATE) * 100,
     expectedValue: 9.82,
     unit: '%',
     legalSource: 'КСО чл. 6 ал. 3',
@@ -162,7 +164,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'employee_doo',
     name: 'ДОО — работник',
-    currentValue: TAX_RATES_2026.employee.doo.value * 100,
+    currentValue: getRateValue('employee.doo', AUDIT_DATE) * 100,
     expectedValue: 7.12,
     unit: '%',
     legalSource: 'КСО чл. 6 ал. 3',
@@ -175,7 +177,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'employer_zo',
     name: 'Здравно осигуряване — работодател',
-    currentValue: TAX_RATES_2026.employer.zo.value * 100,
+    currentValue: getRateValue('employer.zo', AUDIT_DATE) * 100,
     expectedValue: 4.80,
     unit: '%',
     legalSource: 'ЗЗО чл. 40',
@@ -188,7 +190,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'employee_zo',
     name: 'Здравно осигуряване — работник',
-    currentValue: TAX_RATES_2026.employee.zo.value * 100,
+    currentValue: getRateValue('employee.zo', AUDIT_DATE) * 100,
     expectedValue: 3.20,
     unit: '%',
     legalSource: 'ЗЗО чл. 40',
@@ -201,7 +203,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'self_employed_upf',
     name: 'ДЗПО УПФ — самоосигуряващ',
-    currentValue: TAX_RATES_2026.selfEmployed.upf.value * 100,
+    currentValue: getRateValue('selfEmployed.upf', AUDIT_DATE) * 100,
     expectedValue: 5.00,
     unit: '%',
     legalSource: 'КСО чл. 157',
@@ -214,7 +216,7 @@ export const TAX_AUDIT_TABLE: AuditItem[] = [
   {
     id: 'self_employed_zo',
     name: 'Здравно осигуряване — самоосигуряващ',
-    currentValue: TAX_RATES_2026.selfEmployed.zo.value * 100,
+    currentValue: getRateValue('selfEmployed.zo', AUDIT_DATE) * 100,
     expectedValue: 8.00,
     unit: '%',
     legalSource: 'ЗЗО чл. 40',

@@ -1,5 +1,5 @@
 import { CALENDAR_EVENTS_2026 } from '../constants/calendar-events'
-import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
+import { getRateValue } from './taxRates'
 import { getUpcomingEvents, getOverdueEvents } from './calendarUtils'
 import type { LegalForm } from '../store/userStore'
 import type { Transaction } from '../store/accountingStore'
@@ -66,6 +66,7 @@ export function buildAuditReport(options: {
 
   const risks: Risk[] = []
   const now = new Date()
+  const today = now.toISOString().slice(0, 10)
 
   // -- 1. DEADLINE RISKS --
   const upcoming = getUpcomingEvents(CALENDAR_EVENTS_2026, legalForm, 30)
@@ -139,8 +140,8 @@ export function buildAuditReport(options: {
 
   // Companies NOT yet VAT registered approaching threshold
   if (!hasVat) {
-    const VAT_THRESHOLD = 51130  // ЗДДС чл. 96 ал. 1, EUR
-    const WARNING_LEVEL = VAT_THRESHOLD * 0.8  // 40 904 €
+    const VAT_THRESHOLD = getRateValue('vatThreshold', today)  // ЗДДС чл. 96 ал. 1, EUR
+    const WARNING_LEVEL = VAT_THRESHOLD * 0.8
     const totalIncome = transactions
       .filter((t) => ['income', 'vat_out', 'appstore', 'googleplay', 'stripe'].includes(t.type))
       .reduce((s, t) => s + t.amount, 0)
@@ -190,7 +191,7 @@ export function buildAuditReport(options: {
       })
     }
 
-    const minWage = TAX_RATES_2026.minWage.value
+    const minWage = getRateValue('minWage', today)
     const belowMin = activeEmployees.filter((e) => e.grossSalary < minWage)
 
     if (belowMin.length > 0) {

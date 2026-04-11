@@ -1,4 +1,4 @@
-import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
+import { getRateValue } from './taxRates'
 import type { Employee } from '../store/employeesStore'
 
 export interface Obrazec1Row {
@@ -40,30 +40,47 @@ export function calculateObrazec1(
   companyName: string,
   eik: string
 ): Obrazec1Summary {
-  const r = TAX_RATES_2026
+  const rateDate = `${period}-01`
+
+  const erDoo  = getRateValue('employer.doo', rateDate)
+  const erUpf  = getRateValue('employer.upf', rateDate)
+  const erZo   = getRateValue('employer.zo', rateDate)
+  const erOzm  = getRateValue('employer.ozm', rateDate)
+  const erTzpb = getRateValue('employer.tzpb', rateDate)
+  const erBezr = getRateValue('employer.bezr', rateDate)
+
+  const eeDoo  = getRateValue('employee.doo', rateDate)
+  const eeUpf  = getRateValue('employee.upf', rateDate)
+  const eeZo   = getRateValue('employee.zo', rateDate)
+  const eeOzm  = getRateValue('employee.ozm', rateDate)
+  const eeBezr = getRateValue('employee.bezr', rateDate)
+
+  const ddflRate = getRateValue('personalIncomeTax', rateDate)
+  const maxOsig  = getRateValue('maxOsig', rateDate)
+
   const active = employees.filter(e => e.active)
 
   const rows: Obrazec1Row[] = active.map(emp => {
     const gross = emp.grossSalary
-    const osigBase = Math.min(gross, r.maxOsig.value)
+    const osigBase = Math.min(gross, maxOsig)
 
-    const dooEr = osigBase * r.employer.doo.value
-    const upfEr = osigBase * r.employer.upf.value
-    const zoEr = osigBase * r.employer.zo.value
-    const ozmEr = osigBase * r.employer.ozm.value
-    const tzpbEr = osigBase * r.employer.tzpb.value
-    const bezrEr = osigBase * r.employer.bezr.value
+    const dooEr = osigBase * erDoo
+    const upfEr = osigBase * erUpf
+    const zoEr = osigBase * erZo
+    const ozmEr = osigBase * erOzm
+    const tzpbEr = osigBase * erTzpb
+    const bezrEr = osigBase * erBezr
     const totalEr = dooEr + upfEr + zoEr + ozmEr + tzpbEr + bezrEr
 
-    const dooEe = osigBase * r.employee.doo.value
-    const upfEe = osigBase * r.employee.upf.value
-    const zoEe = osigBase * r.employee.zo.value
-    const ozmEe = osigBase * r.employee.ozm.value
-    const bezrEe = osigBase * r.employee.bezr.value
+    const dooEe = osigBase * eeDoo
+    const upfEe = osigBase * eeUpf
+    const zoEe = osigBase * eeZo
+    const ozmEe = osigBase * eeOzm
+    const bezrEe = osigBase * eeBezr
     const totalEe = dooEe + upfEe + zoEe + ozmEe + bezrEe
 
     const taxBase = Math.max(gross - totalEe, 0)
-    const incomeTax = taxBase * r.personalIncomeTax.value
+    const incomeTax = taxBase * ddflRate
     const netSalary = gross - totalEe - incomeTax
     const totalCost = gross + totalEr
 

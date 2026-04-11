@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { TAX_RATES_2026 } from '../../constants/tax-rates-2026'
+import { getRateValue } from '../../lib/taxRates'
 
 export type LegalFormCalc = 'ood' | 'self'
 export type ExpenseMode = 'normative' | 'actual'
@@ -32,15 +32,16 @@ export interface CalcResult {
 
 export function useCalculator(input: CalcInput): CalcResult {
   return useMemo(() => {
-    const r = TAX_RATES_2026
+    const rateDate = `${new Date().getFullYear()}-01-01`
     const { revenue, expenses, legalForm, expenseMode = 'normative' } = input
 
     if (legalForm === 'ood') {
+      const corporateTax = getRateValue('corporateTax', rateDate)
       const grossProfit = revenue - expenses
       const taxableBase = Math.max(grossProfit, 0)
-      const incomeTax = taxableBase * r.corporateTax.value
+      const incomeTax = taxableBase * corporateTax
       const netAnnual = grossProfit - incomeTax
-      // Statutory ЗКПО rate is always r.corporateTax.value (10%)
+      // Statutory ЗКПО rate is always corporateTax (10%)
       // effectiveRate = tax burden on revenue (налоговая нагрузка на приход)
       const effectiveRate = revenue > 0
         ? (incomeTax / revenue) * 100
@@ -66,19 +67,28 @@ export function useCalculator(input: CalcInput): CalcResult {
         ],
       }
     } else {
-      const minOsigBase = r.minOsigSol.value
-      const clampedOsig = Math.min(Math.max(revenue / 12, minOsigBase), r.maxOsig.value)
-      const dooRate = input.hasBornBefore1960 ? r.selfEmployed.dooNoUpf.value : r.selfEmployed.doo.value
-      const upfRate = input.hasBornBefore1960 ? 0 : r.selfEmployed.upf.value
-      const osigRate = dooRate + upfRate + r.selfEmployed.zo.value
+      const minOsigBase =
+        getRateValue('minOsigSol', rateDate) || getRateValue('minOsig', rateDate)
+      const maxOsig = getRateValue('maxOsig', rateDate)
+      const ddflRate = getRateValue('personalIncomeTax', rateDate)
+      const normExpense = getRateValue('normativeExpenses.self', rateDate)
+
+      const clampedOsig = Math.min(Math.max(revenue / 12, minOsigBase), maxOsig)
+      const dooRate = input.hasBornBefore1960
+        ? getRateValue('selfEmployed.dooNoUpf', rateDate)
+        : getRateValue('selfEmployed.doo', rateDate)
+      const upfRate = input.hasBornBefore1960
+        ? 0
+        : getRateValue('selfEmployed.upf', rateDate)
+      const osigRate = dooRate + upfRate + getRateValue('selfEmployed.zo', rateDate)
       const osigMonthly = clampedOsig * osigRate
       const osigAnnual = osigMonthly * 12
 
       const deductibleExpenses = expenseMode === 'normative'
-        ? revenue * r.normativeExpenses.self.value
+        ? revenue * normExpense
         : expenses
       const taxableBase = Math.max(revenue - deductibleExpenses - osigAnnual, 0)
-      const incomeTax = taxableBase * r.personalIncomeTax.value
+      const incomeTax = taxableBase * ddflRate
       const netAnnual = revenue - deductibleExpenses - osigAnnual - incomeTax
       const effectiveRate = revenue > 0 ? ((osigAnnual + incomeTax) / revenue) * 100 : 0
 
