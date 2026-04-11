@@ -1,5 +1,6 @@
 import type { JournalEntry } from '../store/journalStore'
 import type { Transaction } from '../store/accountingStore'
+import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
 
 export interface OPRLine {
   code: string
@@ -20,6 +21,7 @@ export interface OPRReport {
   financialResult: number
   taxableProfit: number
   corporateTax: number
+  nonDeductible: number
   taxDue: number
   overpaid: number
   netProfit: number
@@ -49,6 +51,17 @@ export interface BalanceSheet {
   isBalanced: boolean
   difference: number
   generatedAt: string
+}
+
+export function calculateCorporateTax(
+  financialResult: number,
+  nonDeductible: number = 0,
+): { taxableProfit: number; corporateTax: number; netProfit: number } {
+  const rate = TAX_RATES_2026.corporateTax.value
+  const taxableProfit = Math.max(financialResult + nonDeductible, 0)
+  const corporateTax = taxableProfit * rate
+  const netProfit = financialResult - corporateTax
+  return { taxableProfit, corporateTax, netProfit }
 }
 
 // Build OPR from journal entries + transactions
@@ -104,13 +117,11 @@ export function buildOPR(
     .filter(t => t.date >= from && t.date <= to && t.type === 'vehicle_expense')
     .reduce((s, t) => s + t.amount * (1 - (t.deductiblePercent ?? 0.5)), 0)
 
-  const financialResult  = totalRevenue - totalExpenses
-  const taxableProfit    = Math.max(financialResult + vehicleMixed, 0)
-  const corporateTax     = taxableProfit * 0.10
-  const rawTaxDue        = corporateTax - advancePaid
-  const taxDue           = Math.max(rawTaxDue, 0)
-  const overpaid         = rawTaxDue < 0 ? Math.abs(rawTaxDue) : 0
-  const netProfit        = financialResult - corporateTax
+  const financialResult = totalRevenue - totalExpenses
+  const { taxableProfit, corporateTax, netProfit } = calculateCorporateTax(financialResult, vehicleMixed)
+  const rawTaxDue = corporateTax - advancePaid
+  const taxDue    = Math.max(rawTaxDue, 0)
+  const overpaid  = rawTaxDue < 0 ? Math.abs(rawTaxDue) : 0
 
   const lines: OPRLine[] = [
     // ПРИХОДИ
@@ -143,7 +154,7 @@ export function buildOPR(
     period, companyName, lines,
     totalRevenue, totalExpenses,
     financialResult, taxableProfit,
-    corporateTax, taxDue, overpaid, netProfit,
+    corporateTax, nonDeductible: vehicleMixed, taxDue, overpaid, netProfit,
     generatedAt: new Date().toISOString(),
   }
 }
@@ -153,6 +164,7 @@ export function buildBalanceSheet(
   entries: JournalEntry[],
   upToDate: string,
   companyName: string,
+  transactions?: Transaction[],
 ): BalanceSheet {
   const sumAccount = (account: string, side: 'debit' | 'credit'): number =>
     entries
@@ -233,14 +245,20 @@ export function buildBalanceSheet(
     sumAccount('603', 'debit') + sumAccount('604', 'debit') +
     sumAccount('605', 'debit') + sumAccount('606', 'debit') +
     sumAccount('609', 'debit')
-  const currentProfit = totalRevenue - totalExpenses
-  const corporateTax  = Math.max(currentProfit * 0.10, 0)
-  const netProfit     = currentProfit - corporateTax
+  const financialResult = totalRevenue - totalExpenses
+
+  const nonDeductible = (transactions ?? [])
+    .filter(t => t.date <= upToDate && t.type === 'vehicle_expense')
+    .reduce((s, t) => s + t.amount * (1 - (t.deductiblePercent ?? 0.5)), 0)
+
+  const { netProfit } = calculateCorporateTax(financialResult, nonDeductible)
+
+  const retainedEarnings = sumAccount('122', 'credit') - sumAccount('122', 'debit')
 
   const totalLiabilities =
     creditorsBalance + vatPayable + salaryPayable + taxPayable
 
-  const totalPassive = capitalAmount + netProfit + totalLiabilities
+  const totalPassive = capitalAmount + retainedEarnings + netProfit + totalLiabilities
 
   const difference = Math.abs(totalAssets - totalPassive)
   const isBalanced = difference < 0.01
@@ -252,7 +270,7 @@ export function buildBalanceSheet(
     debtors: debtorsBalance,
     totalAssets,
     capital: capitalAmount,
-    retainedEarnings: 0,
+    retainedEarnings,
     currentProfit: netProfit,
     creditors: creditorsBalance,
     vatPayable,

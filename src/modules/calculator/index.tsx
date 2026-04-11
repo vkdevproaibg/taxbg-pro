@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useUserStore } from '../../store/userStore'
 import { useCalculator } from './useCalculator'
-import type { LegalFormCalc } from './useCalculator'
+import type { LegalFormCalc, ExpenseMode } from './useCalculator'
 import DividendCalculator from './DividendCalculator'
 
 type CalcTab = 'tax' | 'dividend'
@@ -15,8 +15,9 @@ export default function CalculatorModule() {
   const [expenses, setExpenses] = useState(10000)
   const [legalForm, setLegalForm] = useState<LegalFormCalc>(initForm)
   const [bornBefore1960, setBornBefore1960] = useState(false)
+  const [expenseMode, setExpenseMode] = useState<ExpenseMode>('normative')
 
-  const result = useCalculator({ revenue, expenses, legalForm, hasBornBefore1960: bornBefore1960 })
+  const result = useCalculator({ revenue, expenses, legalForm, hasBornBefore1960: bornBefore1960, expenseMode })
 
   return (
     <div className="space-y-5 p-6">
@@ -74,6 +75,34 @@ export default function CalculatorModule() {
           )}
         </div>
 
+        {legalForm === 'self' && (
+          <div>
+            <label className="mb-1 block text-xs text-slate-400">Вид разходи (ЗДДФЛ чл. 29)</label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="radio"
+                  name="expenseMode"
+                  value="normative"
+                  checked={expenseMode === 'normative'}
+                  onChange={() => setExpenseMode('normative')}
+                />
+                Нормативни 25% — без документи
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="radio"
+                  name="expenseMode"
+                  value="actual"
+                  checked={expenseMode === 'actual'}
+                  onChange={() => setExpenseMode('actual')}
+                />
+                Реални разходи — с фактури
+              </label>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="mb-1 block text-xs text-slate-400">Годишни приходи (€)</label>
@@ -90,8 +119,12 @@ export default function CalculatorModule() {
               type="number"
               value={expenses}
               onChange={e => setExpenses(Number(e.target.value))}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none"
+              disabled={legalForm === 'self' && expenseMode === 'normative'}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"
             />
+            {legalForm === 'self' && expenseMode === 'normative' && (
+              <p className="mt-1 text-xs text-slate-400">При нормативни разходи полето не се използва</p>
+            )}
           </div>
         </div>
       </div>
