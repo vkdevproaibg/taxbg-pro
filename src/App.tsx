@@ -28,6 +28,7 @@ import Salary from './pages/Salary'
 import Settings from './pages/Settings'
 import Onboarding from './modules/onboarding'
 import SuperAdmin from './pages/SuperAdmin'
+import AuditHelp from './pages/AuditHelp'
 import { useUserStore } from './store/userStore'
 import { useAccountingStore } from './store/accountingStore'
 import { useCompaniesStore } from './store/companiesStore'
@@ -115,6 +116,7 @@ function App() {
             <Route path="/expat"       element={<Expat />} />
             <Route path="/tours"       element={<PracticalLearning />} />
             <Route path="/superadmin"  element={<SuperAdmin />} />
+        <Route path="/audit-help"  element={<AuditHelp />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <TourOverlay />

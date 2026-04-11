@@ -4,7 +4,7 @@ import {
   BookOpen, Store, Calculator, FileText,
   Wallet, Users,
   CalendarDays,
-  Scale, Bot, Layers,
+  Scale, Bot, Layers, Shield,
 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import type { TranslationKey } from '../../lib/useT'
@@ -58,9 +58,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: 'group_knowledge',
     items: [
-      { to: '/legal',     icon: Scale,  key: 'nav_legal'     },
-      { to: '/assistant', icon: Bot,   key: 'nav_assistant' },
-      { to: '/lifecycle', icon: Layers, key: 'nav_lifecycle' },
+      { to: '/legal',      icon: Scale,  key: 'nav_legal'      },
+      { to: '/audit-help', icon: Shield, key: 'nav_audit_help' },
+      { to: '/assistant',  icon: Bot,    key: 'nav_assistant'  },
+      { to: '/lifecycle',  icon: Layers, key: 'nav_lifecycle'  },
     ],
   },
 ]
