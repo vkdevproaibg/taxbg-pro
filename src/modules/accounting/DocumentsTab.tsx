@@ -8,6 +8,9 @@ import { useIntegrationsStore } from '../../store/integrationsStore'
 import { buildOPR } from '../../lib/financialReports'
 import { calculateObrazec1, obrazec1ToCsv } from '../../lib/obrazec1'
 import { generateDDSXml } from '../../lib/xmlGenerator'
+import { useExportWithWarning } from '../../hooks/useExportWithWarning'
+import ExportWarningModal from '../../components/ui/ExportWarningModal'
+import type { RetentionClass } from '../../lib/exportAcknowledgement'
 
 type DocStatus = 'ready' | 'action' | 'pending' | 'not_applicable'
 type Period = 'month' | 'quarter' | 'year'
@@ -102,8 +105,10 @@ export default function DocumentsTab() {
     [entries, transactions, range, companyName]
   )
 
-  // Download helpers
-  const downloadCsv = (content: string, filename: string) => {
+  const { exportWithWarning, confirm, closeModal, pending, isOpen } = useExportWithWarning()
+
+  // Download helpers (direct write — wrap through exportWithWarning where retention applies)
+  const rawDownloadCsv = (content: string, filename: string) => {
     const blob = new Blob(['\uFEFF' + content], { type: 'text/csv;charset=utf-8' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
@@ -111,12 +116,42 @@ export default function DocumentsTab() {
     URL.revokeObjectURL(url)
   }
 
-  const downloadXml = (content: string, filename: string) => {
+  const rawDownloadXml = (content: string, filename: string) => {
     const blob = new Blob([content], { type: 'application/xml;charset=utf-8' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href = url; a.download = filename; a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const guardedDownloadXml = (
+    content: string,
+    filename: string,
+    documentName: string,
+    retentionClass: RetentionClass,
+    legalBasis: string,
+  ) => {
+    exportWithWarning({
+      documentName,
+      retentionClass,
+      legalBasis,
+      onConfirm: () => rawDownloadXml(content, filename),
+    })
+  }
+
+  const guardedDownloadCsv = (
+    content: string,
+    filename: string,
+    documentName: string,
+    retentionClass: RetentionClass,
+    legalBasis: string,
+  ) => {
+    exportWithWarning({
+      documentName,
+      retentionClass,
+      legalBasis,
+      onConfirm: () => rawDownloadCsv(content, filename),
+    })
   }
 
   // Build documents list
@@ -160,7 +195,13 @@ export default function DocumentsTab() {
               vatPayable,
               vatRefund,
             })
-            downloadXml(xml, `DDS_${range.label}.xml`)
+            guardedDownloadXml(
+              xml,
+              `DDS_${range.label}.xml`,
+              `Справка-декларация по ДДС · ${range.label}`,
+              'accounting_10y',
+              'ЗСч чл. 47; ЗДДС чл. 125',
+            )
           },
         },
         {
@@ -194,9 +235,12 @@ export default function DocumentsTab() {
         {
           label: 'Скачать CSV',
           type: 'download',
-          handler: () => downloadCsv(
+          handler: () => guardedDownloadCsv(
             obrazec1ToCsv(summary),
-            `Obrazec1_${range.from.slice(0, 7)}.csv`
+            `Obrazec1_${range.from.slice(0, 7)}.csv`,
+            `Образец 1 · ${range.from.slice(0, 7)}`,
+            'payroll_50y',
+            'ЗСч чл. 47; наредба МТСП',
           ),
         },
         {
@@ -422,6 +466,18 @@ export default function DocumentsTab() {
           </div>
         ))}
       </div>
+
+      {pending && (
+        <ExportWarningModal
+          isOpen={isOpen}
+          onClose={closeModal}
+          onConfirm={confirm}
+          documentName={pending.documentName}
+          retentionClass={pending.retentionClass}
+          retainUntil={pending.retainUntil}
+          legalBasis={pending.legalBasis}
+        />
+      )}
     </div>
   )
 }

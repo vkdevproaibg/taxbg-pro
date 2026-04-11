@@ -6,6 +6,8 @@ import { buildBalanceSheet, balanceToCsv } from '../../lib/financialReports'
 import ManualBalanceFields from './ManualBalanceFields'
 import HelpButton from '../../components/ui/HelpButton'
 import { BgTermLabel } from '../../lib/bgTerms'
+import { useExportWithWarning } from '../../hooks/useExportWithWarning'
+import ExportWarningModal from '../../components/ui/ExportWarningModal'
 
 export default function BalanceTab() {
   const entries = useJournalStore((s) => s.entries)
@@ -19,7 +21,9 @@ export default function BalanceTab() {
     [entries, upToDate, companyName]
   )
 
-  const handleExport = () => {
+  const { exportWithWarning, confirm, closeModal, pending, isOpen } = useExportWithWarning()
+
+  const downloadCsv = () => {
     const csv  = balanceToCsv(sheet)
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
     const url  = URL.createObjectURL(blob)
@@ -28,6 +32,15 @@ export default function BalanceTab() {
     a.download = `Balance_${companyName}_${upToDate}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const handleExport = () => {
+    exportWithWarning({
+      documentName: `Баланс · ${companyName || 'Company'} · ${upToDate}`,
+      retentionClass: 'accounting_10y',
+      legalBasis: 'ЗСч чл. 47',
+      onConfirm: downloadCsv,
+    })
   }
 
   return (
@@ -190,6 +203,18 @@ export default function BalanceTab() {
           лицензированным счетоводителем.
         </p>
       </div>
+
+      {pending && (
+        <ExportWarningModal
+          isOpen={isOpen}
+          onClose={closeModal}
+          onConfirm={confirm}
+          documentName={pending.documentName}
+          retentionClass={pending.retentionClass}
+          retainUntil={pending.retainUntil}
+          legalBasis={pending.legalBasis}
+        />
+      )}
     </div>
   )
 }

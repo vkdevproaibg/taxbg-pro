@@ -10,6 +10,8 @@ import HelpButton from '../components/ui/HelpButton'
 import { useT } from '../lib/useT'
 import { usePaywall } from '../hooks/usePaywall'
 import PaywallModal from '../components/ui/PaywallModal'
+import { useExportWithWarning } from '../hooks/useExportWithWarning'
+import ExportWarningModal from '../components/ui/ExportWarningModal'
 
 function EmployeeCard({ emp, onToggle, onRemove }: {
   emp: Employee
@@ -170,7 +172,9 @@ export default function Employees() {
   const active = employees.filter(e => e.active)
   const summary = calculateObrazec1(active, period, companyName, eik)
 
-  const handleDownload = () => {
+  const { exportWithWarning, confirm, closeModal, pending, isOpen } = useExportWithWarning()
+
+  const writeObrazec1Csv = () => {
     const csv = obrazec1ToCsv(summary)
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -180,6 +184,15 @@ export default function Employees() {
     a.click()
     URL.revokeObjectURL(url)
     setGenerated(true)
+  }
+
+  const handleDownload = () => {
+    exportWithWarning({
+      documentName: `Образец 1 · ${period}${companyName ? ` · ${companyName}` : ''}`,
+      retentionClass: 'payroll_50y',
+      legalBasis: 'ЗСч чл. 47; наредба МТСП',
+      onConfirm: writeObrazec1Csv,
+    })
   }
 
   if (!dataReady) {
@@ -287,6 +300,18 @@ export default function Employees() {
             </table>
           </div>
         </div>
+      )}
+
+      {pending && (
+        <ExportWarningModal
+          isOpen={isOpen}
+          onClose={closeModal}
+          onConfirm={confirm}
+          documentName={pending.documentName}
+          retentionClass={pending.retentionClass}
+          retainUntil={pending.retainUntil}
+          legalBasis={pending.legalBasis}
+        />
       )}
     </div>
   )

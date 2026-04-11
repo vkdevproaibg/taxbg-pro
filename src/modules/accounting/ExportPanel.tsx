@@ -4,6 +4,8 @@ import { useAccountingStore } from '../../store/accountingStore'
 import { useUserStore } from '../../store/userStore'
 import { exportTransactionsCsv } from '../../lib/csvExport'
 import { useT } from '../../lib/useT'
+import { useExportWithWarning } from '../../hooks/useExportWithWarning'
+import ExportWarningModal from '../../components/ui/ExportWarningModal'
 
 export default function ExportPanel() {
   const t = useT()
@@ -12,8 +14,18 @@ export default function ExportPanel() {
   const year         = new Date().getFullYear()
   const [from, setFrom] = useState(`${year}-01-01`)
   const [to,   setTo  ] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const { exportWithWarning, confirm, closeModal, pending, isOpen } = useExportWithWarning()
 
   const count = transactions.filter(t => t.date >= from && t.date <= to).length
+
+  const handleExport = () => {
+    exportWithWarning({
+      documentName: `${companyName || 'Company'} · Транзакции ${from} — ${to}`,
+      retentionClass: 'accounting_10y',
+      legalBasis: 'ЗСч чл. 47',
+      onConfirm: () => exportTransactionsCsv(transactions, from, to, companyName),
+    })
+  }
 
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
@@ -38,7 +50,7 @@ export default function ExportPanel() {
           />
         </div>
         <button
-          onClick={() => exportTransactionsCsv(transactions, from, to, companyName)}
+          onClick={handleExport}
           disabled={count === 0}
           className="rounded-lg bg-slate-800 px-5 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-40">
           {t('btn_download')} CSV ({count})
@@ -47,6 +59,18 @@ export default function ExportPanel() {
       <p className="mt-2 text-xs text-slate-400">
         Открывается в Excel и Google Sheets · кодировка UTF-8 · разделитель ;
       </p>
+
+      {pending && (
+        <ExportWarningModal
+          isOpen={isOpen}
+          onClose={closeModal}
+          onConfirm={confirm}
+          documentName={pending.documentName}
+          retentionClass={pending.retentionClass}
+          retainUntil={pending.retainUntil}
+          legalBasis={pending.legalBasis}
+        />
+      )}
     </div>
   )
 }

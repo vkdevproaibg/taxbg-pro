@@ -29,6 +29,7 @@ import Settings from './pages/Settings'
 import Onboarding from './modules/onboarding'
 import SuperAdmin from './pages/SuperAdmin'
 import AuditHelp from './pages/AuditHelp'
+import Vault from './pages/Vault'
 import { useUserStore } from './store/userStore'
 import { useAccountingStore } from './store/accountingStore'
 import { useCompaniesStore } from './store/companiesStore'
@@ -134,6 +135,7 @@ function App() {
             <Route path="/tours"       element={<PracticalLearning />} />
             <Route path="/superadmin"  element={<SuperAdmin />} />
         <Route path="/audit-help"  element={<AuditHelp />} />
+            <Route path="/vault"       element={<Vault />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <TourOverlay />
