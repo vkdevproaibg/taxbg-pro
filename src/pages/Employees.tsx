@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
+import { useCompanyDataReady } from '../hooks/useCompanyData'
 import { useEmployeesStore } from '../store/employeesStore'
 import { useUserStore } from '../store/userStore'
 import { useCompaniesStore } from '../store/companiesStore'
@@ -159,6 +160,7 @@ function AddEmployeeForm({ onAdd }: { onAdd: (e: Omit<Employee, 'id'>) => void }
 
 export default function Employees() {
   const t = useT()
+  const dataReady = useCompanyDataReady()
   const { employees, addEmployee, updateEmployee, removeEmployee } = useEmployeesStore()
   const { companyName, eik } = useUserStore()
   const activeCompanyId = useCompaniesStore((s) => s.activeCompanyId)
@@ -178,6 +180,14 @@ export default function Employees() {
     a.click()
     URL.revokeObjectURL(url)
     setGenerated(true)
+  }
+
+  if (!dataReady) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+      </div>
+    )
   }
 
   return (

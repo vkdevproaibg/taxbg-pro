@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useCompanyDataReady } from '../hooks/useCompanyData'
 import { useUserStore } from '../store/userStore'
 import { useEntryAuditStore } from '../store/entryAuditStore'
 import { useAccountingStore } from '../store/accountingStore'
@@ -46,6 +47,7 @@ export default function Dashboard() {
 
   const { getUnresolvedCritical, auditCompleted, path: entryPath, entryDate } = useEntryAuditStore()
   const unresolvedCritical = getUnresolvedCritical()
+  const dataReady = useCompanyDataReady()
 
   const totalIn  = transactions
     .filter((t) => ['income','vat_out','appstore','googleplay','stripe'].includes(t.type))
@@ -53,6 +55,14 @@ export default function Dashboard() {
   const totalOut = transactions
     .filter((t) => ['expense','vat_in','salary','dividend','depreciation','vehicle_tax','vehicle_expense'].includes(t.type))
     .reduce((s, t) => s + t.amount * (t.type === 'vehicle_expense' ? (t.deductiblePercent ?? 0.5) : 1), 0)
+
+  if (!dataReady) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 p-6">

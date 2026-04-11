@@ -111,19 +111,34 @@ export const useCompaniesStore = create<CompaniesState>()(
 
       setActive: (id) => {
         set({ activeCompanyId: id })
-        // Reload accounting + employees for the newly selected company
+
+        // Synchronously clear all company-scoped state BEFORE loading new data
+        // so the UI never shows data from the previous company
         Promise.all([
           import('./accountingStore').then(({ useAccountingStore }) => {
-            if (useAccountingStore.getState().isSynced) {
-              return useAccountingStore.getState().initFromSupabase(id)
-            }
+            useAccountingStore.setState({ transactions: [], isSynced: false })
+          }),
+          import('./journalStore').then(({ useJournalStore }) => {
+            useJournalStore.setState({ entries: [] })
           }),
           import('./employeesStore').then(({ useEmployeesStore }) => {
-            if (useEmployeesStore.getState().isSynced) {
-              return useEmployeesStore.getState().initFromSupabase(id)
-            }
+            useEmployeesStore.setState({ employees: [], isSynced: false })
           }),
-        ])
+        ]).then(() => {
+          // After clearing, reload data for the newly selected company
+          return Promise.all([
+            import('./accountingStore').then(({ useAccountingStore }) =>
+              useAccountingStore.getState().initFromSupabase(id).catch((err) => {
+                console.error('[setActive] accountingStore load failed:', err)
+              })
+            ),
+            import('./employeesStore').then(({ useEmployeesStore }) =>
+              useEmployeesStore.getState().initFromSupabase(id).catch((err) => {
+                console.error('[setActive] employeesStore load failed:', err)
+              })
+            ),
+          ])
+        })
       },
 
       getActive: () => {

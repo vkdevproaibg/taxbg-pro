@@ -55,9 +55,10 @@ interface JournalState {
   setCreditorsBalance: (amount: number) => void
   setCapitalAmount: (amount: number) => void
 
-  getByPeriod: (from: string, to: string) => JournalEntry[]
-  getByAccount: (accountCode: string, from?: string, to?: string) => JournalEntry[]
-  getAccountBalance: (accountCode: string, upToDate?: string) => number
+  getByPeriod: (from: string, to: string, companyId?: string) => JournalEntry[]
+  getByAccount: (accountCode: string, from?: string, to?: string, companyId?: string) => JournalEntry[]
+  getAccountBalance: (accountCode: string, upToDate?: string, companyId?: string) => number
+  clearEntries: () => void
 }
 
 export const useJournalStore = create<JournalState>()(
@@ -116,19 +117,24 @@ export const useJournalStore = create<JournalState>()(
       setCreditorsBalance: (creditorsBalance) => set({ creditorsBalance }),
       setCapitalAmount: (capitalAmount) => set({ capitalAmount }),
 
-      getByPeriod: (from, to) =>
-        get().entries.filter((e) => e.date >= from && e.date <= to),
+      getByPeriod: (from, to, companyId?) =>
+        get().entries.filter((e) => {
+          if (e.date < from || e.date > to) return false
+          if (companyId && e.companyId && e.companyId !== companyId) return false
+          return true
+        }),
 
-      getByAccount: (accountCode, from, to) =>
+      getByAccount: (accountCode, from, to, companyId?) =>
         get().entries.filter((e) => {
           const match = e.debitAccount === accountCode || e.creditAccount === accountCode
           if (!match) return false
           if (from && e.date < from) return false
           if (to && e.date > to) return false
+          if (companyId && e.companyId && e.companyId !== companyId) return false
           return true
         }),
 
-      getAccountBalance: (accountCode, upToDate) => {
+      getAccountBalance: (accountCode, upToDate?, companyId?) => {
         const account = CHART_OF_ACCOUNTS.find((a) => a.code === accountCode)
         if (!account) return 0
 
@@ -136,6 +142,7 @@ export const useJournalStore = create<JournalState>()(
           const match = e.debitAccount === accountCode || e.creditAccount === accountCode
           if (!match) return false
           if (upToDate && e.date > upToDate) return false
+          if (companyId && e.companyId && e.companyId !== companyId) return false
           return true
         })
 
@@ -149,6 +156,8 @@ export const useJournalStore = create<JournalState>()(
         }
         return balance
       },
+
+      clearEntries: () => set({ entries: [] }),
     }),
     { name: 'taxbg-journal' }
   )

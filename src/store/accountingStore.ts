@@ -79,21 +79,37 @@ export const useAccountingStore = create<AccountingState>()(
           importLocalAccountingData,
         } = await import('../lib/supabaseAccounting')
 
+        // Clear journal entries at the start to prevent stale data from a previous company
+        useJournalStore.setState({ entries: [] })
+
         // Check if server already has data for this company
         const serverTxs = await fetchTransactions(companyId)
 
         if (serverTxs.length === 0) {
           // No server data — import from localStorage
+          // Strict filter: only take transactions belonging to this company
           const localTxs = get().transactions.filter(
-            (t) => t.companyId === companyId || !t.companyId
+            (t) => t.companyId === companyId
           )
+          // Legacy transactions without companyId — assign to this company (one-time migration)
+          const legacyTxs = get().transactions.filter((t) => !t.companyId)
+          if (legacyTxs.length > 0) {
+            // Backfill companyId on legacy transactions in localStorage state
+            set((s) => ({
+              transactions: s.transactions.map((t) =>
+                !t.companyId ? { ...t, companyId } : t
+              ),
+            }))
+          }
+          const allLocalTxs = [...localTxs, ...legacyTxs.map((t) => ({ ...t, companyId }))]
+
           const localEntries = useJournalStore.getState().entries.filter(
             (e) => e.companyId === companyId || !e.companyId
           )
 
-          if (localTxs.length > 0) {
+          if (allLocalTxs.length > 0) {
             const { error } = await importLocalAccountingData(
-              localTxs,
+              allLocalTxs,
               localEntries,
               companyId
             )

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useCompanyDataReady } from '../hooks/useCompanyData'
 import type { JournalEntry } from '../store/journalStore'
 import EditJournalEntryModal from '../components/accounting/EditJournalEntryModal'
 import {
@@ -39,6 +40,7 @@ type AccountingTab =
 export default function Accounting() {
   const t = useT()
   const readiness = useDataReadiness()
+  const dataReady = useCompanyDataReady()
   const [tab, setTab] = useState<AccountingTab>('income')
 
   useEffect(() => {
@@ -62,6 +64,14 @@ export default function Accounting() {
     { id: 'reports',   label: t('tab_reports_nap') },
     { id: 'documents', label: t('tab_documents')   },
   ]
+
+  if (!dataReady) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col">

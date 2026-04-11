@@ -34,18 +34,35 @@ export const useEmployeesStore = create<EmployeesState>()(
           importLocalEmployees,
         } = await import('../lib/supabaseEmployees')
 
+        // Clear employees at the start to prevent stale data from a previous company
+        set({ employees: [], isSynced: false })
+
         // Check if server already has employees for this company
         const serverEmployees = await fetchEmployees(companyId)
 
         if (serverEmployees.length === 0) {
           // No server data — import from localStorage
+          // Strict filter: only take employees belonging to this company
           const localEmployees = get().employees.filter(
-            (e) => e.companyId === companyId || !e.companyId
+            (e) => e.companyId === companyId
           )
+          // Legacy employees without companyId — assign to this company (one-time migration)
+          const legacyEmployees = get().employees.filter((e) => !e.companyId)
+          if (legacyEmployees.length > 0) {
+            set((s) => ({
+              employees: s.employees.map((e) =>
+                !e.companyId ? { ...e, companyId } : e
+              ),
+            }))
+          }
+          const allLocalEmployees = [
+            ...localEmployees,
+            ...legacyEmployees.map((e) => ({ ...e, companyId })),
+          ]
 
-          if (localEmployees.length > 0) {
+          if (allLocalEmployees.length > 0) {
             const { error } = await importLocalEmployees(
-              localEmployees,
+              allLocalEmployees,
               companyId
             )
             if (error) {

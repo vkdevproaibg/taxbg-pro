@@ -41,9 +41,10 @@ export function useNavStatus(): NavStatusMap {
   const entries      = useJournalStore(s => s.entries)
   const employees    = useEmployeesStore(s => s.employees)
   const company      = useCompaniesStore(s => s.getActive())
-  const isSuperAdmin = useAuthStore(s => s.isSuperAdmin())
-  const pendingAlerts = useLegislationStore(s =>
-    s.alerts.filter(a => a.status === 'pending')
+  const profile    = useAuthStore(s => s.profile)
+  const isSuperAdmin = profile?.role === 'superadmin'
+  const pendingAlertsCount = useLegislationStore(s =>
+    s.alerts.filter(a => a.status === 'pending').length
   )
 
   const now   = new Date()
@@ -125,7 +126,7 @@ export function useNavStatus(): NavStatusMap {
 
   // ── SuperAdmin ───────────────────────────────────────────
   const superadminStatus: NavStatus = isSuperAdmin
-    ? (pendingAlerts.length > 0 ? 'yellow' : 'green')
+    ? (pendingAlertsCount > 0 ? 'yellow' : 'green')
     : 'none'
 
   // ── Dashboard — worst of all sections ───────────────────
