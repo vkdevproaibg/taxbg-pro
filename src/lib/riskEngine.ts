@@ -44,10 +44,12 @@ export function buildAuditReport(options: {
   transactions: Transaction[]
   employees: Employee[]
   eik: string
+  pendingCorrectionsCount?: number
 }): AuditReport {
   const {
     legalForm, companyName, hasVat,
     hasEmployees, transactions, employees, eik,
+    pendingCorrectionsCount = 0,
   } = options
 
   // Don't generate risks for unconfigured companies
@@ -261,6 +263,24 @@ export function buildAuditReport(options: {
         detectedAt: now.toISOString(),
       })
     }
+  }
+
+  // -- 7. PENDING CORRECTIONS FROM RATE CHANGES --
+  // A retroactive tax rate change detected a numeric impact on
+  // closed periods but the correction batch has not been
+  // confirmed yet. Flag as high-risk until reviewed.
+  if (pendingCorrectionsCount > 0) {
+    risks.push({
+      id: 'corrections-pending',
+      level: 'high',
+      title: 'Има непотвърдени корекции от промяна на ставки',
+      description:
+        `${pendingCorrectionsCount} непотвърдени корекции. ` +
+        'Променена е данъчна ставка с обратна сила. Прегледайте и потвърдете корекцията.',
+      suggestedAction: 'Отидете в Админ → Корекции и прегледайте.',
+      category: 'compliance',
+      detectedAt: now.toISOString(),
+    })
   }
 
   // Calculate health score

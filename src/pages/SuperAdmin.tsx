@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useUserStore } from '../store/userStore'
+import { useCompaniesStore } from '../store/companiesStore'
 import { useLegislationStore } from '../store/legislationStore'
 import LegislationTab from '../modules/superadmin/LegislationTab'
+import CorrectionsTab from '../modules/superadmin/CorrectionsTab'
 import {
   fetchAdminStats,
   fetchAuditEvents,
@@ -12,7 +14,7 @@ import {
   type AuditEvent,
 } from '../lib/supabaseAdmin'
 
-type AdminTab = 'stats' | 'users' | 'logs' | 'legislation'
+type AdminTab = 'stats' | 'users' | 'logs' | 'legislation' | 'corrections'
 
 const T = {
   ru: {
@@ -26,6 +28,7 @@ const T = {
     tabUsers: 'Пользователи',
     tabLogs: 'Аудит лог',
     tabLegislation: 'Законодательство',
+    tabCorrections: 'Корректировки',
     totalUsers: 'Всего пользователей',
     proUsers: 'Pro подписок',
     freeUsers: 'Free пользователей',
@@ -52,6 +55,7 @@ const T = {
     tabUsers: 'Users',
     tabLogs: 'Audit log',
     tabLegislation: 'Legislation',
+    tabCorrections: 'Corrections',
     totalUsers: 'Total users',
     proUsers: 'Pro subscriptions',
     freeUsers: 'Free users',
@@ -78,6 +82,7 @@ const T = {
     tabUsers: 'Потребители',
     tabLogs: 'Одит лог',
     tabLegislation: 'Законодателство',
+    tabCorrections: 'Корекции',
     totalUsers: 'Общо потребители',
     proUsers: 'Pro абонаменти',
     freeUsers: 'Free потребители',
@@ -104,6 +109,7 @@ const T = {
     tabUsers: 'Користувачі',
     tabLogs: 'Аудит лог',
     tabLegislation: 'Законодавство',
+    tabCorrections: 'Коригування',
     totalUsers: 'Всього користувачів',
     proUsers: 'Pro підписок',
     freeUsers: 'Free користувачів',
@@ -129,6 +135,11 @@ export default function SuperAdmin() {
   const loadLegislationAlerts = useLegislationStore(s => s.loadAlerts)
   const legislationLoaded = useLegislationStore(s => s.isLoaded)
   const pendingAlerts = useLegislationStore(s => s.getPendingCount())
+  const activeCompanyId = useCompaniesStore(s => s.activeCompanyId)
+  const loadCorrections = useLegislationStore(s => s.loadCorrectionReports)
+  const pendingCorrections = useLegislationStore(s =>
+    activeCompanyId ? s.getPendingCorrectionsCount(activeCompanyId) : 0,
+  )
 
   // Access guard — hard wall, not a redirect
   if (profile?.role !== 'superadmin') {
@@ -177,11 +188,17 @@ export default function SuperAdmin() {
     if (!legislationLoaded) loadLegislationAlerts()
   }, [legislationLoaded, loadLegislationAlerts])
 
+  // Lazy-load correction reports for the active company
+  useEffect(() => {
+    if (activeCompanyId) loadCorrections(activeCompanyId)
+  }, [activeCompanyId, loadCorrections])
+
   const TABS: { id: AdminTab; label: string; icon: string; badge?: number }[] = [
     { id: 'stats',       label: labels.tabStats,       icon: '📊' },
     { id: 'users',       label: labels.tabUsers,       icon: '👥' },
     { id: 'logs',        label: labels.tabLogs,        icon: '📋' },
     { id: 'legislation', label: labels.tabLegislation, icon: '📜', badge: pendingAlerts },
+    { id: 'corrections', label: labels.tabCorrections, icon: '🛠', badge: pendingCorrections },
   ]
 
   return (
@@ -254,7 +271,7 @@ export default function SuperAdmin() {
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
 
-        {loading && tab !== 'legislation' && (
+        {loading && tab !== 'legislation' && tab !== 'corrections' && (
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             {labels.loading}
           </p>
@@ -430,6 +447,9 @@ export default function SuperAdmin() {
 
         {/* ── Legislation ── */}
         {tab === 'legislation' && <LegislationTab />}
+
+        {/* ── Corrections ── */}
+        {tab === 'corrections' && <CorrectionsTab />}
 
       </div>
     </div>

@@ -4,6 +4,8 @@ import { useUserStore } from '../store/userStore'
 import { useEntryAuditStore } from '../store/entryAuditStore'
 import { useAccountingStore } from '../store/accountingStore'
 import { useEmployeesStore } from '../store/employeesStore'
+import { useCompaniesStore } from '../store/companiesStore'
+import { useLegislationStore } from '../store/legislationStore'
 import { CALENDAR_EVENTS_2026 } from '../constants/calendar-events'
 import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
 import { buildAuditReport } from '../lib/riskEngine'
@@ -25,6 +27,10 @@ export default function Dashboard() {
   const readiness = useDataReadiness()
   const transactions = useAccountingStore((s) => s.transactions)
   const employees    = useEmployeesStore((s) => s.employees)
+  const activeCompanyId = useCompaniesStore((s) => s.activeCompanyId)
+  const pendingCorrectionsCount = useLegislationStore((s) =>
+    activeCompanyId ? s.getPendingCorrectionsCount(activeCompanyId) : 0,
+  )
   const navigate     = useNavigate()
   const r            = TAX_RATES_2026
 
@@ -34,8 +40,8 @@ export default function Dashboard() {
   )
 
   const report = useMemo(() =>
-    buildAuditReport({ legalForm, companyName, taxPeriod, hasVat, hasEmployees, transactions, employees, eik }),
-    [legalForm, companyName, taxPeriod, hasVat, hasEmployees, transactions, employees, eik]
+    buildAuditReport({ legalForm, companyName, taxPeriod, hasVat, hasEmployees, transactions, employees, eik, pendingCorrectionsCount }),
+    [legalForm, companyName, taxPeriod, hasVat, hasEmployees, transactions, employees, eik, pendingCorrectionsCount]
   )
 
   const { getUnresolvedCritical, auditCompleted, path: entryPath, entryDate } = useEntryAuditStore()

@@ -2,6 +2,8 @@ import { useMemo, useEffect, useState } from 'react'
 import { useUserStore } from '../store/userStore'
 import { useAccountingStore } from '../store/accountingStore'
 import { useEmployeesStore } from '../store/employeesStore'
+import { useCompaniesStore } from '../store/companiesStore'
+import { useLegislationStore } from '../store/legislationStore'
 import { buildAuditReport } from '../lib/riskEngine'
 import type { Risk, RiskLevel } from '../lib/riskEngine'
 import {
@@ -101,6 +103,10 @@ export default function Auditor() {
   const { legalForm, companyName, taxPeriod, hasVat, hasEmployees, eik } = useUserStore()
   const transactions = useAccountingStore((s) => s.transactions)
   const employees = useEmployeesStore((s) => s.employees)
+  const activeCompanyId = useCompaniesStore((s) => s.activeCompanyId)
+  const pendingCorrectionsCount = useLegislationStore((s) =>
+    activeCompanyId ? s.getPendingCorrectionsCount(activeCompanyId) : 0,
+  )
 
   const [pushConfig, setPushConfig] = useState(loadPushConfig)
   const [pushPermission, setPushPermission] = useState(getPushPermission)
@@ -116,8 +122,9 @@ export default function Auditor() {
       transactions,
       employees,
       eik,
+      pendingCorrectionsCount,
     }),
-  [legalForm, companyName, taxPeriod, hasVat, hasEmployees, transactions, employees, eik])
+  [legalForm, companyName, taxPeriod, hasVat, hasEmployees, transactions, employees, eik, pendingCorrectionsCount])
 
   // Send push notifications when report is ready
   useEffect(() => {
