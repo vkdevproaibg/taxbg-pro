@@ -1,6 +1,31 @@
 import type { Transaction } from '../store/accountingStore'
-import type { JournalEntry } from '../store/journalStore'
+import { useJournalStore, type JournalEntry } from '../store/journalStore'
 import { llmChat } from './llm'
+
+// Ensure the opening capital contribution exists as a journal entry:
+//   Дт 503 (bank) / Кт 102 (registered capital)
+// This makes the balance sheet work from day one.
+export function ensureCapitalEntry(
+  capitalEur: number = 1,
+  companyCreatedDate: string = new Date().toISOString().slice(0, 10),
+): void {
+  const journal = useJournalStore.getState()
+  const hasCapital = journal.entries.some(
+    (e) => e.creditAccount === '102' || e.creditAccount === '101'
+  )
+  if (hasCapital || capitalEur <= 0) return
+
+  journal.addEntry({
+    date: companyCreatedDate,
+    debitAccount:  '503',
+    creditAccount: '102',
+    amount: capitalEur,
+    description: 'Внасяне на основен капитал',
+    linkedTransactionId: undefined,
+    source: 'auto',
+    period: companyCreatedDate.slice(0, 7),
+  })
+}
 
 const TRANSACTION_RULES: Record<
   string,

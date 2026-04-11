@@ -1,10 +1,12 @@
 import { useAccountingStore } from '../../store/accountingStore'
+import { useT } from '../../lib/useT'
 import AddTransaction from './AddTransaction'
 import TransactionList from './TransactionList'
 import VehicleGuide from './VehicleGuide'
 import ExportPanel from './ExportPanel'
 
 export default function AccountingModule() {
+  const t = useT()
   const transactions = useAccountingStore((s) => s.transactions)
 
   const totalIn = transactions
@@ -22,13 +24,13 @@ export default function AccountingModule() {
 
   return (
     <div className="space-y-5 p-6">
-      <h1 className="text-2xl font-semibold">Бухгалтерия</h1>
+      <h1 className="text-2xl font-semibold">{t('page_accounting')}</h1>
 
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Приходи',  value: totalIn,            color: 'text-green-600' },
-          { label: 'Разходи',  value: totalOut,           color: 'text-red-500'   },
-          { label: 'Резултат', value: totalIn - totalOut, color: totalIn - totalOut >= 0 ? 'text-violet-600' : 'text-red-600' },
+          { label: t('label_income'),  value: totalIn,            color: 'text-green-600' },
+          { label: t('label_expense'), value: totalOut,           color: 'text-red-500'   },
+          { label: t('label_result'),  value: totalIn - totalOut, color: totalIn - totalOut >= 0 ? 'text-violet-600' : 'text-red-600' },
         ].map((item) => (
           <div key={item.label} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
             <div className={`text-xl font-bold ${item.color}`}>{item.value.toFixed(2)} €</div>

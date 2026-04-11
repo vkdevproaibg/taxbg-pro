@@ -4,6 +4,7 @@ import { generateDDSXml, downloadXml } from '../../../lib/xmlGenerator'
 import { generateDDSPdf } from '../../../lib/pdfGenerator'
 import { DDS_SCHEMA } from '../../../constants/nap-schemas'
 import HelpButton from '../../../components/ui/HelpButton'
+import { BgTermLabel } from '../../../lib/bgTerms'
 
 interface Props {
   data: DDSFormData
@@ -69,7 +70,9 @@ export default function DeclarationDDS({ data }: Props) {
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">Справка-декларация по ЗДДС</h2>
+            <h2 className="text-lg font-semibold">
+              <BgTermLabel termKey="spravka_deklaraciya" />
+            </h2>
             <HelpButton topic="ЗДДС чл. 125 декларация ДДС срок 14" title="Декларация по ДДС" pageContext="reports" size="md" />
           </div>
           <p className="text-sm text-slate-400">
@@ -79,7 +82,12 @@ export default function DeclarationDDS({ data }: Props) {
             </span>
           </p>
         </div>
-        <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-600">ДДС</span>
+        <span
+          className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-600"
+          title="ДДС — НДС / VAT"
+        >
+          ДДС
+        </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -103,7 +111,10 @@ export default function DeclarationDDS({ data }: Props) {
       </div>
 
       <div>
-        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Раздел А — Продажби</h3>
+        <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Раздел А — Продажби</h3>
+        <div className="mb-2">
+          <BgTermLabel termKey="nacislen_dds" className="text-xs" />
+        </div>
         <div className="space-y-2">
           <Field label="20% — данъчна основа" value={form.salesBase20} onChange={v => set({ salesBase20: v })} />
           <Field label="20% — ДДС" value={form.vatOut20} onChange={v => set({ vatOut20: v })} />
@@ -118,7 +129,10 @@ export default function DeclarationDDS({ data }: Props) {
       </div>
 
       <div>
-        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400">Раздел Б — Покупки</h3>
+        <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">Раздел Б — Покупки</h3>
+        <div className="mb-2">
+          <BgTermLabel termKey="danachen_kredit" className="text-xs" />
+        </div>
         <div className="space-y-2">
           <Field
             label="20% — данъчна основа"

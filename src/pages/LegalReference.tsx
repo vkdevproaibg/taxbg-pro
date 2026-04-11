@@ -6,6 +6,7 @@ import { useUserStore } from '../store/userStore'
 import { useHelpStore } from '../store/helpStore'
 import { getUpcomingEvents } from '../lib/calendarUtils'
 import HelpButton from '../components/ui/HelpButton'
+import { useT } from '../lib/useT'
 
 type Tab = 'today' | 'all'
 
@@ -16,6 +17,7 @@ function findActForEvent(legalBasis: string) {
 }
 
 export default function LegalReference() {
+  const t = useT()
   const { legalForm } = useUserStore()
   const openHelp = useHelpStore((s) => s.openHelp)
   const [tab, setTab] = useState<Tab>('today')
@@ -74,17 +76,17 @@ export default function LegalReference() {
   return (
     <div className="space-y-5 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Справочник нормативной базы</h1>
+        <h1 className="text-2xl font-semibold">{t('page_legal')}</h1>
         <p className="mt-1 text-sm text-slate-400">
-          Действующие законы Болгарии 2026 · нажмите ? для AI-объяснения на вашем языке
+          {t('legal_subtitle')}
         </p>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
         {([
-          { id: 'today', label: `Сегодня актуально (${sortedTodayActs.length})` },
-          { id: 'all', label: 'Все законы' },
+          { id: 'today', label: `${t('legal_today_tab')} (${sortedTodayActs.length})` },
+          { id: 'all',   label: t('legal_all_tab') },
         ] as { id: Tab; label: string }[]).map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`flex-1 rounded-lg py-2 text-sm transition-colors ${
@@ -230,7 +232,7 @@ export default function LegalReference() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск: ЗКПО, дивиденти, амортизация..."
+            placeholder={t('legal_search_placeholder')}
             className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-violet-400 focus:outline-none"
           />
 

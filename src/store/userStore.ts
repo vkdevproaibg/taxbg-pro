@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 export type LegalForm = 'ood' | 'et' | 'self'
 export type AppLanguage = 'ru' | 'uk' | 'en' | 'bg'
 export type LLMProvider = 'openrouter' | 'original'
+export type LLMMode = 'own_key' | 'platform'
 
 interface UserState {
   onboardingDone: boolean
@@ -15,6 +16,7 @@ interface UserState {
   companyName: string
   taxPeriod: string
   llmProvider: LLMProvider
+  llmMode: LLMMode
   llmApiKey: string
   llmModel: string
   useCustomModelForChat: boolean
@@ -44,6 +46,7 @@ export const useUserStore = create<UserState>()(
       companyName: '',
       taxPeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
       llmProvider: 'openrouter',
+      llmMode: 'own_key',
       llmApiKey: '',
       llmModel: import.meta.env.VITE_LLM_MODEL ?? 'anthropic/claude-sonnet-4-5',
       useCustomModelForChat: false,

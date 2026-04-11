@@ -3,8 +3,10 @@ import { format } from 'date-fns'
 import { useAccountingStore } from '../../store/accountingStore'
 import { useUserStore } from '../../store/userStore'
 import { exportTransactionsCsv } from '../../lib/csvExport'
+import { useT } from '../../lib/useT'
 
 export default function ExportPanel() {
+  const t = useT()
   const transactions = useAccountingStore(s => s.transactions)
   const companyName  = useUserStore(s => s.companyName)
   const year         = new Date().getFullYear()
@@ -18,7 +20,7 @@ export default function ExportPanel() {
       <h3 className="mb-4 font-medium text-slate-700">Експорт на транзакции</h3>
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label className="mb-1 block text-xs text-slate-400">От</label>
+          <label className="mb-1 block text-xs text-slate-400">{t('label_from')}</label>
           <input
             type="date"
             value={from}
@@ -27,7 +29,7 @@ export default function ExportPanel() {
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-slate-400">До</label>
+          <label className="mb-1 block text-xs text-slate-400">{t('label_to')}</label>
           <input
             type="date"
             value={to}
@@ -39,7 +41,7 @@ export default function ExportPanel() {
           onClick={() => exportTransactionsCsv(transactions, from, to, companyName)}
           disabled={count === 0}
           className="rounded-lg bg-slate-800 px-5 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-40">
-          Изтегли CSV ({count})
+          {t('btn_download')} CSV ({count})
         </button>
       </div>
       <p className="mt-2 text-xs text-slate-400">

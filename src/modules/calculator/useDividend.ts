@@ -64,7 +64,7 @@ export function useDividend(input: DividendInput): DividendResult {
         { label: 'Корпоративен данък 10%', amount: -corporateTax, note: 'ЗКПО чл. 20' },
         { label: 'Чиста печалба', amount: profitAfterTax },
         { label: `Дял на собственика (${input.ownerSharePct}%)`, amount: dividendGross },
-        { label: 'Данък дивиденти 7%', amount: -dividendTax, note: 'ЗДДФЛ чл. 38' },
+        { label: 'Данък дивиденти 5%', amount: -dividendTax, note: 'ЗДДФЛ чл. 38 ал. 2' },
         { label: 'ДИВИДЕНТ НА РЪКА', amount: dividendNet },
         { separator: true, label: '', amount: 0 },
         { label: 'Заплата брутто (для сравнения)', amount: gross },

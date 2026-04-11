@@ -18,5 +18,5 @@ export const DDS_SCHEMA: FormSchema = {
 export const ZKPO_SCHEMA: FormSchema = {
   version: '2026-01',
   effectiveFrom: '2026-01-01',
-  notes: 'Годишна данъчна декларация по ЗКПО за 2025 г. (подава се до 30.04.2026). Суми в EUR.',
+  notes: 'Годишна данъчна декларация по ЗКПО за 2025 г. (подава се от 01.03 до 30.06.2026). Суми в EUR.',
 }

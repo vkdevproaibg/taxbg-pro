@@ -1,8 +1,48 @@
-import { useAuth } from '../../hooks/useAuth'
+import { useNavigate } from 'react-router-dom'
+import { useAuthStore } from '../../store/authStore'
 import { useUserStore } from '../../store/userStore'
 
+function UserMenu() {
+  const { user, profile, isDemo, signOut } = useAuthStore()
+  const navigate = useNavigate()
+
+  if (isDemo) {
+    return (
+      <button
+        onClick={() => navigate('/auth')}
+        className="rounded-lg px-3 py-1.5 text-xs font-medium"
+        style={{ backgroundColor: 'var(--accent)', color: 'white' }}>
+        Войти
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="text-right hidden sm:block">
+        <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+          {profile?.full_name ?? user?.email}
+        </p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {profile?.role === 'superadmin' ? '⚡ Супер-админ'
+           : profile?.role === 'superuser' ? '⭐ Супер-юзер'
+           : profile?.role === 'accountant' ? '📊 Бухгалтер'
+           : profile?.role === 'director' ? '🏢 Директор'
+           : profile?.subscription === 'pro' ? '💎 Pro'
+           : '🔓 Free'}
+        </p>
+      </div>
+      <button
+        onClick={signOut}
+        className="rounded-lg border border-[--border] px-3 py-1.5 text-xs text-[--text-secondary] hover:bg-[--surface] transition-colors"
+      >
+        Выйти
+      </button>
+    </div>
+  )
+}
+
 export default function Topbar() {
-  const { user, signOut } = useAuth()
   const companyName = useUserStore((s) => s.companyName)
 
   return (
@@ -33,19 +73,8 @@ export default function Topbar() {
           )}
         </div>
 
-        {user && (
-          <div className="flex items-center gap-4">
-            <span className="hidden text-xs text-[--text-muted] sm:block">
-              {user.email}
-            </span>
-            <button
-              onClick={signOut}
-              className="rounded-lg border border-[--border] px-3 py-1.5 text-xs text-[--text-secondary] hover:bg-[--surface] transition-colors"
-            >
-              Выйти
-            </button>
-          </div>
-        )}
+        {/* User menu */}
+        <UserMenu />
       </div>
     </header>
   )

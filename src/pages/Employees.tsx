@@ -2,15 +2,20 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { useEmployeesStore } from '../store/employeesStore'
 import { useUserStore } from '../store/userStore'
+import { useCompaniesStore } from '../store/companiesStore'
 import { calculateObrazec1, obrazec1ToCsv } from '../lib/obrazec1'
 import type { Employee } from '../store/employeesStore'
 import HelpButton from '../components/ui/HelpButton'
+import { useT } from '../lib/useT'
+import { usePaywall } from '../hooks/usePaywall'
+import PaywallModal from '../components/ui/PaywallModal'
 
 function EmployeeCard({ emp, onToggle, onRemove }: {
   emp: Employee
   onToggle: () => void
   onRemove: () => void
 }) {
+  const t = useT()
   return (
     <div className={`rounded-xl border p-4 ${emp.active ? 'border-slate-100 bg-white' : 'border-slate-100 bg-slate-50 opacity-60'}`}>
       <div className="flex items-start justify-between gap-3">
@@ -26,7 +31,7 @@ function EmployeeCard({ emp, onToggle, onRemove }: {
             onClick={onToggle}
             className={`rounded-lg px-3 py-1 text-xs ${emp.active ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}
           >
-            {emp.active ? 'Активен' : 'Неактивен'}
+            {emp.active ? t('employees_active') : t('employees_inactive')}
           </button>
           <button onClick={onRemove} className="text-lg leading-none text-slate-300 hover:text-red-400">×</button>
         </div>
@@ -36,12 +41,15 @@ function EmployeeCard({ emp, onToggle, onRemove }: {
 }
 
 function AddEmployeeForm({ onAdd }: { onAdd: (e: Omit<Employee, 'id'>) => void }) {
+  const t = useT()
+  const { checkAccess } = usePaywall()
   const [name, setName] = useState('')
   const [egn, setEgn] = useState('')
   const [position, setPosition] = useState('')
   const [gross, setGross] = useState('')
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [open, setOpen] = useState(false)
+  const [showPaywall, setShowPaywall] = useState(false)
 
   const handleAdd = () => {
     if (!name || !egn || !gross) return
@@ -55,12 +63,20 @@ function AddEmployeeForm({ onAdd }: { onAdd: (e: Omit<Employee, 'id'>) => void }
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="w-full rounded-xl border border-dashed border-slate-300 py-3 text-sm text-slate-500 transition-colors hover:border-violet-400 hover:text-violet-600"
-      >
-        + Добавить сотрудника
-      </button>
+      <>
+        <button
+          onClick={() => {
+            if (!checkAccess('add_employee')) { setShowPaywall(true); return }
+            setOpen(true)
+          }}
+          className="w-full rounded-xl border border-dashed border-slate-300 py-3 text-sm text-slate-500 transition-colors hover:border-violet-400 hover:text-violet-600"
+        >
+          {t('employees_add')}
+        </button>
+        {showPaywall && (
+          <PaywallModal reason="add_employee" onClose={() => setShowPaywall(false)} />
+        )}
+      </>
     )
   }
 
@@ -142,8 +158,10 @@ function AddEmployeeForm({ onAdd }: { onAdd: (e: Omit<Employee, 'id'>) => void }
 }
 
 export default function Employees() {
+  const t = useT()
   const { employees, addEmployee, updateEmployee, removeEmployee } = useEmployeesStore()
   const { companyName, eik } = useUserStore()
+  const activeCompanyId = useCompaniesStore((s) => s.activeCompanyId)
   const [period, setPeriod] = useState(format(new Date(), 'yyyy-MM'))
   const [generated, setGenerated] = useState(false)
 
@@ -165,9 +183,9 @@ export default function Employees() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Служители и Образец 1</h1>
+        <h1 className="text-2xl font-semibold">{t('page_employees')}</h1>
         <p className="mt-1 text-sm text-slate-400">
-          Управление сотрудниками · ежемесячная форма до 25-го числа
+          {t('employees_subtitle')}
         </p>
       </div>
 
@@ -180,7 +198,7 @@ export default function Employees() {
       <div className="space-y-3">
         {employees.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">
-            Нет сотрудников. Добавьте первого.
+            {t('employees_no_employees')}
           </div>
         ) : (
           employees.map(emp => (
@@ -192,7 +210,9 @@ export default function Employees() {
             />
           ))
         )}
-        <AddEmployeeForm onAdd={addEmployee} />
+        <AddEmployeeForm
+          onAdd={(e) => addEmployee({ ...e, companyId: activeCompanyId ?? undefined })}
+        />
       </div>
 
       {active.length > 0 && (

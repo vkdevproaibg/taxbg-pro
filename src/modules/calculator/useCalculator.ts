@@ -38,7 +38,11 @@ export function useCalculator(input: CalcInput): CalcResult {
       const taxableBase = Math.max(grossProfit, 0)
       const incomeTax = taxableBase * r.corporateTax.value
       const netAnnual = grossProfit - incomeTax
-      const effectiveRate = revenue > 0 ? (incomeTax / revenue) * 100 : 0
+      // Statutory ЗКПО rate is always r.corporateTax.value (10%)
+      // effectiveRate = tax burden on revenue (налоговая нагрузка на приход)
+      const effectiveRate = revenue > 0
+        ? (incomeTax / revenue) * 100
+        : 0
 
       return {
         revenue,

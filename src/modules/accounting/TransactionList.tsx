@@ -67,14 +67,6 @@ function TxRow({ tx, onDelete }: { tx: Transaction; onDelete: (id: string) => vo
 export default function TransactionList({ filterFrom, filterTo, filterTypes }: Props = {}) {
   const { transactions, deleteTransaction } = useAccountingStore()
 
-  if (transactions.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">
-        Все още няма транзакции. Добавете ръчно или импортирайте от платформа.
-      </div>
-    )
-  }
-
   const sorted = useMemo(() => {
     let list = [...transactions]
     if (filterFrom) list = list.filter((t) => t.date >= filterFrom)
@@ -82,6 +74,14 @@ export default function TransactionList({ filterFrom, filterTo, filterTypes }: P
     if (filterTypes) list = list.filter((t) => filterTypes.includes(t.type))
     return list.sort((a, b) => b.date.localeCompare(a.date))
   }, [transactions, filterFrom, filterTo, filterTypes])
+
+  if (transactions.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">
+        Все още няма транзакции. Добавете ръчно или импортирайте от платформа.
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-2">

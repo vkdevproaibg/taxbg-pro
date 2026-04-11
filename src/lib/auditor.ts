@@ -4,6 +4,10 @@ import type { LegalForm } from '../store/userStore'
 import type { Transaction } from '../store/accountingStore'
 import type { Employee } from '../store/employeesStore'
 
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(2).replace(/\.?0+$/, '')}%`
+}
+
 export function buildAuditorSystemPrompt(options: {
   legalForm: LegalForm
   companyName: string
@@ -35,10 +39,10 @@ export function buildAuditorSystemPrompt(options: {
 - Период: ${options.taxPeriod}
 
 СТАВКИ 2026 (EUR):
-- КНП (корпоративен данък): ${r.corporateTax.value * 100}%
-- ДДФЛ: ${r.personalIncomeTax.value * 100}%
-- Данък дивиденти: ${r.dividendTax.value * 100}%
-- ДДС стандартен: ${r.vat.value * 100}%
+- КНП (корпоративен данък): ${formatPercent(r.corporateTax.value)}
+- ДДФЛ: ${formatPercent(r.personalIncomeTax.value)}
+- Данък дивиденти: ${formatPercent(r.dividendTax.value)}
+- ДДС стандартен: ${formatPercent(r.vat.value)}
 - МРЗ: ${r.minWage.value} €
 - Макс. осигурителен доход: ${r.maxOsig.value} €
 

@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { addMonths, subMonths, format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { useUserStore } from '../store/userStore'
+import { useT } from '../lib/useT'
+import { getDateLocale } from '../lib/calendarUtils'
+import { useDataReadiness } from '../lib/dataReadiness'
 import { CALENDAR_EVENTS_2026, CATEGORY_META } from '../constants/calendar-events'
 import type { EventCategory } from '../constants/calendar-events'
 import {
@@ -25,7 +27,10 @@ import HelpButton from '../components/ui/HelpButton'
 type ViewMode = 'month' | 'next' | 'year'
 
 export default function Calendar() {
-  const { legalForm, llmApiKey } = useUserStore()
+  const t = useT()
+  const readiness = useDataReadiness()
+  const { legalForm, llmApiKey, language } = useUserStore()
+  const locale = getDateLocale(language)
 
   const [viewMode,      setViewMode]      = useState<ViewMode>('month')
   const [currentDate,   setCurrentDate]   = useState(new Date())
@@ -43,8 +48,8 @@ export default function Calendar() {
       filterCat === 'all' || e.category === filterCat
     ), [filterCat])
 
-  const calendar     = useMemo(() => buildCalendarMonth(year, month,     filtered, legalForm), [year, month,     filtered, legalForm])
-  const nextCalendar = useMemo(() => buildCalendarMonth(year, month + 1, filtered, legalForm), [year, month,     filtered, legalForm])
+  const calendar     = useMemo(() => buildCalendarMonth(year, month,     filtered, legalForm, locale), [year, month,     filtered, legalForm, locale])
+  const nextCalendar = useMemo(() => buildCalendarMonth(year, month + 1, filtered, legalForm, locale), [year, month,     filtered, legalForm, locale])
   const upcoming     = useMemo(() => getUpcomingEvents(filtered, legalForm, 30),               [filtered, legalForm])
   const overdue      = useMemo(() => getOverdueEvents(filtered, legalForm),                    [filtered, legalForm])
 
@@ -76,21 +81,21 @@ export default function Calendar() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold">Данъчен календар</h1>
+            <h1 className="text-2xl font-semibold">{t('page_calendar')}</h1>
             <HelpButton topic="календар на отчетността задължения ООД дедлайни" title="Календарь отчётности" pageContext="calendar" size="md" />
           </div>
           <p className="mt-1 text-sm text-slate-400">
-            Отчётность и уплата налогов · сроки и штрафы · ставки 2026
+            {t('calendar_subtitle')}
           </p>
         </div>
         <button onClick={handleCheckLegislation} disabled={checking}
           className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-          {checking ? '⏳ Проверка изменений...' : '🔍 Проверить законодательство'}
+          {checking ? '⏳ Проверка изменений...' : `🔍 ${t('calendar_check_legislation')}`}
         </button>
       </div>
 
       {/* Legislation updates banner */}
-      {updates.length > 0 && (
+      {readiness.isReady && updates.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
           <p className="text-sm font-semibold text-amber-800">
             ⚠ Обнаружены изменения в законодательстве ({updates.length})
@@ -130,11 +135,25 @@ export default function Calendar() {
         </div>
       )}
 
+      {/* Setup hint — shown until data is configured */}
+      {!readiness.isReady && (
+        <div className="rounded-xl p-4"
+          style={{ backgroundColor: 'var(--accent-light)', border: '1px solid var(--accent)' }}>
+          <p className="text-sm font-medium" style={{ color: 'var(--accent-text)' }}>
+            💡 Заполните профиль компании для персонализации календаря
+          </p>
+          <p className="text-xs mt-1" style={{ color: 'var(--accent-text)' }}>
+            После ввода ЕИК и названия компании — календарь покажет актуальные дедлайны
+            именно для вашей правовой формы и отобразит просрочки.
+          </p>
+        </div>
+      )}
+
       {/* Overdue banner */}
-      {overdue.length > 0 && (
+      {readiness.isReady && overdue.length > 0 && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
           <p className="text-sm font-semibold text-red-700">
-            🚨 Просроченные обязательства ({overdue.length})
+            🚨 {t('calendar_overdue')} ({overdue.length})
           </p>
           {overdue.slice(0, 3).map(({ event, daysOverdue }) => (
             <EventCard key={event.id} event={event} daysOverdue={daysOverdue} />
@@ -168,9 +187,9 @@ export default function Calendar() {
       {/* View tabs */}
       <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
         {([
-          { id: 'month', label: 'Этот месяц' },
-          { id: 'next',  label: 'Следующий'  },
-          { id: 'year',  label: 'Весь год'   },
+          { id: 'month', label: t('calendar_this_month') },
+          { id: 'next',  label: t('calendar_next_month') },
+          { id: 'year',  label: t('calendar_full_year')  },
         ] as { id: ViewMode; label: string }[]).map((v) => (
           <button key={v.id} onClick={() => setViewMode(v.id)}
             className={`flex-1 rounded-lg py-2 text-sm transition-colors ${
@@ -192,8 +211,8 @@ export default function Calendar() {
           </button>
           <span className="font-medium text-slate-700 capitalize">
             {viewMode === 'month'
-              ? format(currentDate,            'LLLL yyyy', { locale: ru })
-              : format(addMonths(currentDate, 1), 'LLLL yyyy', { locale: ru })
+              ? format(currentDate,               'LLLL yyyy', { locale })
+              : format(addMonths(currentDate, 1), 'LLLL yyyy', { locale })
             }
           </span>
           <button onClick={() => setCurrentDate((d) => addMonths(d, 1))}
@@ -223,7 +242,7 @@ export default function Calendar() {
       {selectedDate && selectedEvents.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-sm font-medium text-slate-600">
-            {format(selectedDate, 'd MMMM yyyy', { locale: ru })}
+            {format(selectedDate, 'd MMMM yyyy', { locale })}
           </h2>
           {selectedEvents.map((event) => (
             <EventCard key={event.id} event={event} />
@@ -234,17 +253,17 @@ export default function Calendar() {
       {/* Upcoming list */}
       <div>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-slate-400">
-          Ближайшие 30 дней
+          {t('calendar_upcoming')}
         </h2>
         {upcoming.length === 0 ? (
-          <p className="text-sm text-slate-400">Нет предстоящих обязательств</p>
+          <p className="text-sm text-slate-400">{t('dashboard_no_deadlines')}</p>
         ) : (
           <div className="space-y-3">
             {upcoming.slice(0, 10).map(({ event, date, daysUntil }) => (
               <div key={`${event.id}-${date.toISOString()}`} className="flex gap-3">
                 <div className="min-w-[52px] rounded-lg bg-slate-50 p-2 text-center shrink-0">
                   <div className="text-xs text-slate-400">
-                    {format(date, 'MMM', { locale: ru })}
+                    {format(date, 'MMM', { locale })}
                   </div>
                   <div className="text-lg font-bold text-slate-700">
                     {format(date, 'd')}

@@ -80,16 +80,18 @@ export async function generateDDSPdf(data: DDSFormData & { vatPayable?: number; 
   dl(await doc.save(), `DDS_draft_${data.period}.pdf`)
 }
 
-export async function generateZKPOPdf(data: ZKPOFormData & { taxableProfit?: number; corporateTax?: number; taxDue?: number }) {
+export async function generateZKPOPdf(data: ZKPOFormData & { taxableProfit?: number; corporateTax?: number; taxDue?: number; overpaid?: number }) {
   const { doc, page, font, bold } = await base()
   const taxableProfit = data.taxableProfit ?? Math.max(data.accountingProfit + data.nonDeductibleExpenses, 0)
   const corporateTax  = data.corporateTax  ?? taxableProfit * 0.10
-  const taxDue        = data.taxDue        ?? Math.max(corporateTax - data.advancePaid, 0)
+  const rawTaxDue     = corporateTax - data.advancePaid
+  const taxDue        = data.taxDue        ?? Math.max(rawTaxDue, 0)
+  const overpaid      = data.overpaid      ?? (rawTaxDue < 0 ? Math.abs(rawTaxDue) : 0)
   let y = 800
 
   t(page, '[ЧЕРНОВА — не е официален бланк на НАП]', 40, y, font, 8, rgb(0.6, 0.3, 0))
   y -= 18; t(page, 'ГОДИШНА ДАНЪЧНА ДЕКЛАРАЦИЯ ПО ЗКПО', 40, y, bold, 14)
-  y -= 16; t(page, `Година: ${data.year}   Краен срок: 30 април ${data.year + 1}   Валута: EUR`, 40, y, font)
+  y -= 16; t(page, `Година: ${data.year}   Краен срок: 30 юни ${data.year + 1}   Валута: EUR`, 40, y, font)
   y -= 24; ln(page, y)
 
   y -= 14; t(page, `Фирма: ${data.companyName}   ЕИК: ${data.eik}`, 40, y, font)
@@ -121,7 +123,7 @@ export async function generateZKPOPdf(data: ZKPOFormData & { taxableProfit?: num
   t(page,
     taxDue > 0
       ? `ДАНЪК ЗА ДОВНАСЯНЕ: ${taxDue.toFixed(2)} EUR`
-      : `НАДВНЕСЕН ДАНЪК: ${taxDue.toFixed(2)} EUR`,
+      : `НАДВНЕСЕН ДАНЪК: ${overpaid.toFixed(2)} EUR`,
     40, y, bold, 12, col)
 
   y -= 60

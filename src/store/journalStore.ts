@@ -16,6 +16,16 @@ export interface JournalEntry {
   source: 'auto' | 'manual' | 'ai'
   aiSuggested?: boolean
   period: string
+  companyId?: string
+
+  // Manual editing support
+  isManuallyEdited?: boolean
+  originalDebit?:    string   // original account code before first edit
+  originalCredit?:   string
+  originalAmount?:   number
+  editedBy?:         string   // profile id
+  editedAt?:         string   // ISO datetime
+  editReason?:       string
 }
 
 interface JournalState {
@@ -29,6 +39,17 @@ interface JournalState {
   addEntry: (entry: Omit<JournalEntry, 'id'>) => void
   updateEntry: (id: string, patch: Partial<JournalEntry>) => void
   deleteEntry: (id: string) => void
+  editEntry: (
+    id: string,
+    patch: {
+      debitAccount?: string
+      creditAccount?: string
+      amount?: number
+      description?: string
+      editReason?: string
+    },
+    editorProfileId: string
+  ) => void
   setBankBalance: (amount: number, date: string) => void
   setDebtorsBalance: (amount: number) => void
   setCreditorsBalance: (amount: number) => void
@@ -61,6 +82,32 @@ export const useJournalStore = create<JournalState>()(
 
       deleteEntry: (id) =>
         set((s) => ({ entries: s.entries.filter((e) => e.id !== id) })),
+
+      editEntry: (id, patch, editorProfileId) =>
+        set((s) => ({
+          entries: s.entries.map((e) => {
+            if (e.id !== id) return e
+            return {
+              ...e,
+              // Save originals on first edit only
+              originalDebit:  e.isManuallyEdited ? e.originalDebit  : e.debitAccount,
+              originalCredit: e.isManuallyEdited ? e.originalCredit : e.creditAccount,
+              originalAmount: e.isManuallyEdited ? e.originalAmount : e.amount,
+              // Apply patch
+              ...(patch.debitAccount  !== undefined && { debitAccount:  patch.debitAccount }),
+              ...(patch.creditAccount !== undefined && { creditAccount: patch.creditAccount }),
+              ...(patch.amount        !== undefined && { amount:        patch.amount }),
+              ...(patch.description   !== undefined && { description:   patch.description }),
+              // Mark as manually edited
+              isManuallyEdited: true,
+              editedBy:   editorProfileId,
+              editedAt:   new Date().toISOString(),
+              editReason: patch.editReason ?? e.editReason,
+            }
+          }),
+        })),
+        // TODO: sync to Supabase journal_lines
+        // (update is_manually_edited, original_*, edited_by, edited_at)
 
       setBankBalance: (bankBalance, bankBalanceDate) =>
         set({ bankBalance, bankBalanceDate }),

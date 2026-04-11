@@ -3,6 +3,9 @@ import { format } from 'date-fns'
 import { useAccountingStore } from '../../store/accountingStore'
 import type { TransactionType } from '../../store/accountingStore'
 import HelpButton from '../../components/ui/HelpButton'
+import { useT } from '../../lib/useT'
+import { usePaywall } from '../../hooks/usePaywall'
+import PaywallModal from '../../components/ui/PaywallModal'
 
 interface AddTransactionProps {
   defaultTypes?: TransactionType[]
@@ -18,7 +21,7 @@ const TYPES: { value: TransactionType; label: string; hint: string; hasVat: bool
   { value: 'googleplay', label: 'Google Play плащане', hint: 'Нетна сума от Google (без комисия и ДДС)',hasVat: false },
   { value: 'stripe',     label: 'Stripe / PSP',        hint: 'Нетна сума от payment processor',         hasVat: false },
   { value: 'salary',     label: 'Заплата',             hint: 'Изплатена нетна заплата на служител',     hasVat: false },
-  { value: 'dividend',   label: 'Дивидент',            hint: 'Изплатен дивидент на собственик (7%)',    hasVat: false },
+  { value: 'dividend',   label: 'Дивидент',            hint: 'Изплатен дивидент на собственик (5% данък — ЗДДФЛ чл. 38)',    hasVat: false },
   { value: 'refund',     label: 'Refund / отписка',    hint: 'Върнато плащане — намалява приходите',    hasVat: false },
   { value: 'asset_purchase',  label: 'Покупка ОС (авто/оборудване)', hint: 'Основно средство — не е разход, а актив на баланса',         hasVat: false },
   { value: 'depreciation',    label: 'Амортизация на ОС',            hint: 'Годишна амортизация: 25% за МПС по ЗКПО',                    hasVat: false },
@@ -33,7 +36,10 @@ const VAT_RATES: { value: 0.20 | 0.09 | 0; label: string }[] = [
 ]
 
 export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionProps = {}) {
+  const t = useT()
   const add = useAccountingStore((s) => s.addTransaction)
+  const { checkAccess } = usePaywall()
+  const [paywallReason, setPaywallReason] = useState<'add_transaction' | null>(null)
 
   const visibleTypes = defaultTypes
     ? TYPES.filter((t) => defaultTypes.includes(t.value))
@@ -56,6 +62,10 @@ export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionPr
   const showDeductible = type === 'vehicle_expense'
 
   const handleAdd = () => {
+    if (!checkAccess('add_transaction')) {
+      setPaywallReason('add_transaction')
+      return
+    }
     if (!description.trim() || !amount) return
     const amt = Number(amount)
     add({
@@ -88,14 +98,14 @@ export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionPr
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
 
         <div>
-          <label className="mb-1 block text-xs text-slate-400">Дата</label>
+          <label className="mb-1 block text-xs text-slate-400">{t('label_date')}</label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none" />
         </div>
 
         <div className="col-span-2">
           <div className="flex items-center gap-1.5">
-            <label className="text-xs text-slate-400">Тип</label>
+            <label className="text-xs text-slate-400">{t('label_type')}</label>
             <HelpButton topic="типове транзакции бухгалтерия ДДС осигуровки" pageContext="accounting" />
           </div>
           <select value={type} onChange={(e) => setType(e.target.value as TransactionType)}
@@ -121,7 +131,7 @@ export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionPr
         )}
 
         <div className="col-span-2">
-          <label className="mb-1 block text-xs text-slate-400">Описание</label>
+          <label className="mb-1 block text-xs text-slate-400">{t('label_description')}</label>
           <input value={description} onChange={(e) => setDesc(e.target.value)}
             placeholder="Фактура №001, хостинг, заплата Иванов..."
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none" />
@@ -191,8 +201,15 @@ export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionPr
       <button onClick={handleAdd}
         disabled={!description.trim() || !amount}
         className="mt-4 rounded-lg bg-violet-600 px-6 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40">
-        Добави
+        {t('btn_add')}
       </button>
+
+      {paywallReason && (
+        <PaywallModal
+          reason={paywallReason}
+          onClose={() => setPaywallReason(null)}
+        />
+      )}
     </div>
   )
 }

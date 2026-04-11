@@ -14,15 +14,15 @@ export const TAX_RATES_2025 = {
   // Corporate
   corporateTax: { value: 0.10, effectiveFrom: '2025-01-01', effectiveTo: null, source: 'ЗКПО чл. 20', notes_ru: 'Корпоративен данък — 10% от данъчната печалба' },
   personalIncomeTax: { value: 0.10, effectiveFrom: '2025-01-01', effectiveTo: null, source: 'ЗДДФЛ чл. 48', notes_ru: 'ДДФЛ — 10% плоска ставка' },
-  dividendTax: { value: 0.07, effectiveFrom: '2025-01-01', effectiveTo: null, source: 'ЗДДФЛ чл. 38', notes_ru: 'Данък дивиденти — 7% (снижен с 10% с 2025)' },
+  dividendTax: { value: 0.05, effectiveFrom: '2025-01-01', effectiveTo: null, source: 'ЗДДФЛ чл. 38 ал. 2', notes_ru: 'Данък дивиденти — 5% (ЗДДФЛ чл. 38 ал. 2, ефективна тежест ООД: 14.5%)' },
   vat: { value: 0.20, effectiveFrom: '2025-01-01', effectiveTo: null, source: 'ЗДДС чл. 66', notes_ru: 'Стандартна ставка ДДС — 20%' },
   vatHospitality: { value: 0.09, effectiveFrom: '2025-01-01', effectiveTo: null, source: 'ЗДДС чл. 66 ал.2', notes_ru: 'Намалена ставка за хотели' },
-  vatThreshold: { value: 51130, effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗДДС чл. 96', notes_ru: 'Праг ДДС регистрация (100 000 BGN ÷ 1.95583, €)' },
+  vatThreshold: { value: 51130, effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗДДС чл. 96', notes_ru: 'Праг ДДС регистрация — 51 130 €/год (ЗДДС чл. 96, ал. 1)' },
 
   // Social insurance thresholds
-  minOsig: { value: 551, effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗБДОО 2026', notes_ru: 'Минимален осигурителен доход (€, от 01.01.2026)' },
+  minOsig: { value: 620.20, effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗБДОО 2026', notes_ru: 'Минимален осигурителен доход (€, от 01.01.2026)' },
   maxOsig: { value: 2112, effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗБДОО 2026', notes_ru: 'Максимален осигурителен доход (€)' },
-  minWage: { value: 551, effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ПМС 2026', notes_ru: 'Минимална работна заплата (€)' },
+  minWage: { value: 620.20, effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ПМС 2026', notes_ru: 'Минимална работна заплата (€)' },
 
   // Employer contributions (% of gross, capped at maxOsig)
   employer: {

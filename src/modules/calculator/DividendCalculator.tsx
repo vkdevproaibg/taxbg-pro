@@ -23,7 +23,7 @@ export default function DividendCalculator() {
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-medium text-slate-700">Дивиденты vs зарплата</h3>
           <HelpButton
-            topic="ЗКПО чл. 247 дивиденти ЗДДФЛ чл. 38 данък дивиденти 7%"
+            topic="ЗКПО чл. 247 дивиденти ЗДДФЛ чл. 38 данък дивиденти 5%"
             title="Дивиденты и налоги"
             pageContext="calculator"
           />

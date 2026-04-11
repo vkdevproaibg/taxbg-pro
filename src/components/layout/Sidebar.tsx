@@ -1,12 +1,17 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, ShieldCheck,
+  LayoutDashboard, ShieldCheck, Building2,
   BookOpen, Store, Calculator, FileText,
   Wallet, Users,
   CalendarDays,
-  Scale, Bot,
+  Scale, Bot, Layers,
 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
+import type { TranslationKey } from '../../lib/useT'
+import CompanySwitcher from '../../modules/companies/CompanySwitcher'
+import { useNavStatus } from '../../lib/navStatus'
+import NavStatusDot from '../ui/NavStatusDot'
+import type { NavStatus } from '../../lib/navStatus'
 
 type NavItem = {
   to: string
@@ -15,20 +20,21 @@ type NavItem = {
 }
 
 type NavGroup = {
-  label: string
+  labelKey: TranslationKey
   items: NavItem[]
 }
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Главное',
+    labelKey: 'group_main',
     items: [
-      { to: '/',        icon: LayoutDashboard, key: 'nav_dashboard' },
-      { to: '/auditor', icon: ShieldCheck,     key: 'nav_auditor'   },
+      { to: '/',          icon: LayoutDashboard, key: 'nav_dashboard'  },
+      { to: '/auditor',   icon: ShieldCheck,     key: 'nav_auditor'   },
+      { to: '/companies', icon: Building2,       key: 'nav_companies' },
     ],
   },
   {
-    label: 'Налоги и финансы',
+    labelKey: 'group_taxes',
     items: [
       { to: '/accounting', icon: BookOpen,   key: 'nav_accounting' },
       { to: '/platforms',  icon: Store,      key: 'nav_platforms'  },
@@ -37,29 +43,42 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Сотрудники',
+    labelKey: 'group_employees',
     items: [
       { to: '/salary',    icon: Wallet, key: 'nav_salary'    },
       { to: '/employees', icon: Users,  key: 'nav_employees' },
     ],
   },
   {
-    label: 'Сроки и контроль',
+    labelKey: 'group_deadlines',
     items: [
       { to: '/calendar', icon: CalendarDays, key: 'nav_calendar' },
     ],
   },
   {
-    label: 'Знания',
+    labelKey: 'group_knowledge',
     items: [
-      { to: '/legal',     icon: Scale, key: 'nav_legal'     },
+      { to: '/legal',     icon: Scale,  key: 'nav_legal'     },
       { to: '/assistant', icon: Bot,   key: 'nav_assistant' },
+      { to: '/lifecycle', icon: Layers, key: 'nav_lifecycle' },
     ],
   },
 ]
 
+const STATUS_KEYS: Record<string, keyof ReturnType<typeof useNavStatus>> = {
+  nav_dashboard:  'dashboard',
+  nav_accounting: 'accounting',
+  nav_reports:    'reports',
+  nav_calendar:   'calendar',
+  nav_employees:  'employees',
+  nav_salary:     'salary',
+  nav_auditor:    'auditor',
+  nav_companies:  'companies',
+}
+
 export default function Sidebar() {
-  const t = useT()
+  const t         = useT()
+  const navStatus = useNavStatus()
 
   return (
     <aside
@@ -67,44 +86,54 @@ export default function Sidebar() {
       style={{ backgroundColor: 'var(--surface-sidebar)' }}
     >
 
+      <CompanySwitcher />
+
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
         {NAV_GROUPS.map((group) => (
-          <div key={group.label}>
+          <div key={group.labelKey}>
             <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider"
               style={{ color: 'var(--text-muted)' }}>
-              {group.label}
+              {t(group.labelKey)}
             </p>
 
             <div className="space-y-0.5">
-              {group.items.map(({ to, icon: Icon, key }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={to === '/'}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-                      isActive ? 'font-medium' : ''
-                    }`
-                  }
-                  style={({ isActive }) => ({
-                    backgroundColor: isActive ? 'var(--accent-light)' : 'transparent',
-                    color: isActive ? 'var(--accent-text)' : 'var(--text-secondary)',
-                  })}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon
-                        size={15}
-                        style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }}
-                      />
-                      <span className="truncate text-xs">
-                        {t(key as Parameters<typeof t>[0])}
-                      </span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
+              {group.items.map(({ to, icon: Icon, key }) => {
+                const statusKey = STATUS_KEYS[key]
+                const status: NavStatus = statusKey
+                  ? navStatus[statusKey]
+                  : 'none'
+
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={to === '/'}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+                        isActive ? 'font-medium' : ''
+                      }`
+                    }
+                    style={({ isActive }) => ({
+                      backgroundColor: isActive ? 'var(--accent-light)' : 'transparent',
+                      color: isActive ? 'var(--accent-text)' : 'var(--text-secondary)',
+                    })}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon
+                          size={15}
+                          style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)', flexShrink: 0 }}
+                        />
+                        <span className="truncate text-xs flex-1">
+                          {t(key as Parameters<typeof t>[0])}
+                        </span>
+                        <NavStatusDot status={status} />
+                      </>
+                    )}
+                  </NavLink>
+                )
+              })}
             </div>
           </div>
         ))}

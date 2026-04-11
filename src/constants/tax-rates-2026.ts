@@ -5,7 +5,7 @@ export interface TaxRateYear extends TaxRate {}
 export const TAX_RATES_2026 = {
   corporateTax:     { value: 0.10,   effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗКПО чл. 20',    notes_ru: 'Корпоративен данък — 10%' },
   personalIncomeTax:{ value: 0.10,   effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗДДФЛ чл. 48',   notes_ru: 'ДДФЛ — 10% плоска ставка' },
-  dividendTax:      { value: 0.07,   effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗДДФЛ чл. 38',   notes_ru: 'Данък дивиденти — 7%' },
+  dividendTax:      { value: 0.05,   effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗДДФЛ чл. 38 ал. 2',   notes_ru: 'Данък дивиденти — 5% (ЗДДФЛ чл. 38 ал. 2)' },
   vat:              { value: 0.20,   effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗДДС чл. 66',    notes_ru: 'ДДС — 20%' },
   vatHospitality:   { value: 0.09,   effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗДДС чл. 66 ал.2', notes_ru: 'Намалена ставка за хотели — 9%' },
   vatThreshold:     { value: 51130,  effectiveFrom: '2026-01-01', effectiveTo: null, source: 'ЗДДС чл. 96',    notes_ru: 'Праг ДДС регистрация €/год' },

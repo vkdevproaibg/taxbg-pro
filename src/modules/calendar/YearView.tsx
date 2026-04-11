@@ -1,9 +1,9 @@
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
-import { buildCalendarMonth } from '../../lib/calendarUtils'
+import { buildCalendarMonth, getDateLocale } from '../../lib/calendarUtils'
 import type { CalendarEvent } from '../../constants/calendar-events'
 import { CATEGORY_META } from '../../constants/calendar-events'
 import type { LegalForm } from '../../store/userStore'
+import { useUserStore } from '../../store/userStore'
 
 interface Props {
   year: number
@@ -13,8 +13,10 @@ interface Props {
 }
 
 export default function YearView({ year, events, legalForm, onMonthClick }: Props) {
+  const language = useUserStore((s) => s.language)
+  const locale = getDateLocale(language)
   const months = Array.from({ length: 12 }, (_, i) =>
-    buildCalendarMonth(year, i, events, legalForm)
+    buildCalendarMonth(year, i, events, legalForm, locale)
   )
 
   return (
@@ -23,7 +25,7 @@ export default function YearView({ year, events, legalForm, onMonthClick }: Prop
         <button key={i} onClick={() => onMonthClick(i)}
           className="rounded-xl border border-slate-100 bg-white p-4 text-left shadow-sm hover:border-violet-300 transition-colors">
           <div className="font-medium text-slate-700 capitalize mb-3">
-            {format(new Date(year, i, 1), 'LLLL', { locale: ru })}
+            {format(new Date(year, i, 1), 'LLLL', { locale })}
           </div>
           <div className="space-y-1.5">
             {month.events.length === 0 ? (

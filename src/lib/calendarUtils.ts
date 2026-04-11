@@ -3,8 +3,20 @@ import {
   format,
 } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { uk } from 'date-fns/locale'
+import { enUS } from 'date-fns/locale'
+import { bg } from 'date-fns/locale'
 import type { CalendarEvent } from '../constants/calendar-events'
 import type { LegalForm } from '../store/userStore'
+
+export function getDateLocale(language: string) {
+  switch (language) {
+    case 'uk': return uk
+    case 'en': return enUS
+    case 'bg': return bg
+    default:   return ru
+  }
+}
 
 export interface CalendarDay {
   date: Date
@@ -53,7 +65,8 @@ export function buildCalendarMonth(
   year: number,
   month: number,
   events: CalendarEvent[],
-  legalForm: LegalForm
+  legalForm: LegalForm,
+  locale = ru
 ): CalendarMonth {
   const firstDay = new Date(year, month, 1)
 
@@ -85,7 +98,7 @@ export function buildCalendarMonth(
 
   return {
     year, month,
-    label: format(firstDay, 'LLLL yyyy', { locale: ru }),
+    label: format(firstDay, 'LLLL yyyy', { locale }),
     days,
     events: monthEvents,
   }

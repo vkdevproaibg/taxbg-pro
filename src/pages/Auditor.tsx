@@ -10,6 +10,9 @@ import {
   checkAndSendNotifications,
 } from '../lib/pushNotifications'
 import HelpButton from '../components/ui/HelpButton'
+import { useT } from '../lib/useT'
+import { useDataReadiness } from '../lib/dataReadiness'
+import EmptyState from '../components/ui/EmptyState'
 
 const LEVEL_META: Record<RiskLevel, { label: string; color: string; bg: string; dot: string }> = {
   critical: { label: 'Критично', color: 'text-red-700', bg: 'bg-red-50 border-red-200', dot: 'bg-red-500' },
@@ -20,6 +23,7 @@ const LEVEL_META: Record<RiskLevel, { label: string; color: string; bg: string; 
 }
 
 function RiskCard({ risk }: { risk: Risk }) {
+  const t = useT()
   const meta = LEVEL_META[risk.level]
   return (
     <div className={`rounded-xl border p-4 space-y-2 ${meta.bg}`}>
@@ -63,7 +67,7 @@ function RiskCard({ risk }: { risk: Risk }) {
       <p className="text-sm text-slate-600 leading-relaxed">{risk.description}</p>
 
       <div className="rounded-lg bg-white/60 border border-white px-3 py-2">
-        <p className="text-xs font-medium text-slate-500 mb-0.5">Рекомендация:</p>
+        <p className="text-xs font-medium text-slate-500 mb-0.5">{t('auditor_recommendation')}:</p>
         <p className="text-sm text-slate-700">{risk.suggestedAction}</p>
       </div>
     </div>
@@ -71,6 +75,7 @@ function RiskCard({ risk }: { risk: Risk }) {
 }
 
 function HealthGauge({ score }: { score: number }) {
+  const t = useT()
   const color =
     score >= 80 ? 'text-green-600' :
     score >= 60 ? 'text-amber-500' :
@@ -85,12 +90,14 @@ function HealthGauge({ score }: { score: number }) {
     <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm text-center">
       <div className={`text-5xl font-bold ${color}`}>{score}</div>
       <div className={`text-sm font-medium mt-1 ${color}`}>{label}</div>
-      <div className="text-xs text-slate-400 mt-1">Индекс здоровья · макс. 100</div>
+      <div className="text-xs text-slate-400 mt-1">{t('auditor_health')} · макс. 100</div>
     </div>
   )
 }
 
 export default function Auditor() {
+  const t = useT()
+  const readiness = useDataReadiness()
   const { legalForm, companyName, taxPeriod, hasVat, hasEmployees, eik } = useUserStore()
   const transactions = useAccountingStore((s) => s.transactions)
   const employees = useEmployeesStore((s) => s.employees)
@@ -127,6 +134,25 @@ export default function Auditor() {
     }
   }
 
+  if (!readiness.isReady) {
+    return (
+      <div className="p-6">
+        <h1 className="text-2xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('page_auditor')}
+        </h1>
+        <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+          Болгарский налоговый адвокат · анализ рисков в реальном времени
+        </p>
+        <EmptyState
+          icon="🛡️"
+          title="Данные ещё не введены"
+          subtitle="Аудитор анализирует реальные данные вашей компании. Для работы нужно заполнить профиль и добавить первые транзакции."
+          missingSteps={readiness.missingSteps}
+        />
+      </div>
+    )
+  }
+
   const filtered = filterLevel === 'all'
     ? report.risks
     : report.risks.filter((r) => r.level === filterLevel)
@@ -144,7 +170,7 @@ export default function Auditor() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Аудитор</h1>
+          <h1 className="text-2xl font-semibold">{t('page_auditor')}</h1>
           <p className="mt-1 text-sm text-slate-400">
             Болгарский налоговый адвокат · анализ рисков в реальном времени
           </p>
@@ -158,9 +184,9 @@ export default function Auditor() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <HealthGauge score={report.healthScore} />
         {([
-          { label: 'Критических', value: counts.critical, color: 'text-red-600' },
-          { label: 'Высоких', value: counts.high, color: 'text-orange-500' },
-          { label: 'Всего', value: report.totalCount, color: 'text-slate-700' },
+          { label: t('auditor_critical'), value: counts.critical, color: 'text-red-600' },
+          { label: t('auditor_high'),     value: counts.high,           color: 'text-orange-500' },
+          { label: t('auditor_total'),    value: report.totalCount,     color: 'text-slate-700' },
         ] as { label: string; value: number; color: string }[]).map((item) => (
           <div key={item.label}
             className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm text-center">
@@ -180,7 +206,7 @@ export default function Auditor() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <p className="text-sm font-medium text-slate-700">
-                🔔 Push-уведомления о дедлайнах
+                🔔 {t('auditor_push_title')}
               </p>
               <p className="text-xs text-slate-400 mt-0.5">
                 {pushPermission === 'granted' && pushConfig.enabled
@@ -193,7 +219,7 @@ export default function Auditor() {
             {pushPermission !== 'denied' && !(pushPermission === 'granted' && pushConfig.enabled) && (
               <button onClick={handleEnablePush}
                 className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700">
-                Включить уведомления
+                {t('auditor_enable_push')}
               </button>
             )}
             {pushPermission === 'granted' && pushConfig.enabled && (
@@ -241,7 +267,7 @@ export default function Auditor() {
       {filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-green-200 bg-green-50 p-8 text-center">
           <div className="text-3xl mb-2">✅</div>
-          <p className="font-medium text-green-700">Рисков не обнаружено</p>
+          <p className="font-medium text-green-700">{t('auditor_no_risks')}</p>
           <p className="text-sm text-green-600 mt-1">
             {filterLevel === 'all'
               ? 'Все обязательства выполнены, данные в порядке'

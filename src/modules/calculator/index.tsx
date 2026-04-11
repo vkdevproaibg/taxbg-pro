@@ -103,15 +103,22 @@ export default function CalculatorModule() {
             value: result.netAnnual,
             color: result.netAnnual >= 0 ? 'text-green-600' : 'text-red-600',
           },
-          { label: 'Данъчна тежест', value: result.incomeTax, color: 'text-red-500' },
+          { label: 'Данък', value: result.incomeTax, color: 'text-red-500' },
           { label: 'Осигуровки/год', value: result.osigAnnual, color: 'text-orange-500' },
-          { label: 'Ефективна ставка', value: null, pct: result.effectiveRate, color: 'text-violet-600' },
+          { label: 'Данъчна тежест', value: null, pct: result.effectiveRate, color: 'text-violet-600' },
         ].map(item => (
           <div key={item.label} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
             <div className={`text-xl font-bold ${item.color}`}>
-              {item.pct !== undefined ? `${item.pct.toFixed(1)}%` : `${item.value!.toFixed(2)} €`}
+              {item.pct !== undefined
+                ? `${item.pct.toFixed(1)}%`
+                : `${item.value!.toFixed(2)} €`}
             </div>
             <div className="mt-1 text-xs text-slate-400">{item.label}</div>
+            {item.label === 'Данъчна тежест' && (
+              <div className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                данък / приходи · ЗКПО: 10%
+              </div>
+            )}
           </div>
         ))}
       </div>

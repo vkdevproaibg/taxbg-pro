@@ -26,8 +26,15 @@ export async function llmChat(
     apiKey?: string
   }
 ): Promise<LLMResponse> {
-  const apiKey = options?.apiKey ?? import.meta.env.VITE_OPENROUTER_API_KEY
-  if (!apiKey) throw new Error('VITE_OPENROUTER_API_KEY не задан')
+  // TODO Step 2: if llmMode === 'platform',
+  // call Supabase Edge Function instead of direct API
+  // The edge function holds our key server-side
+  const apiKey = options?.apiKey
+  if (!apiKey) {
+    throw new Error(
+      'Для использования AI введите ключ OpenRouter в Настройки. В Pro подписке ключ не нужен.'
+    )
+  }
 
   const model = options?.model ?? DEFAULT_MODEL
 
@@ -80,8 +87,15 @@ export async function* llmStream(
     apiKey?: string
   }
 ): AsyncGenerator<string> {
-  const apiKey = options?.apiKey ?? import.meta.env.VITE_OPENROUTER_API_KEY
-  if (!apiKey) throw new Error('VITE_OPENROUTER_API_KEY не задан')
+  // TODO Step 2: if llmMode === 'platform',
+  // call Supabase Edge Function instead of direct API
+  // The edge function holds our key server-side
+  const apiKey = options?.apiKey
+  if (!apiKey) {
+    throw new Error(
+      'Для использования AI введите ключ OpenRouter в Настройки. В Pro подписке ключ не нужен.'
+    )
+  }
 
   const model = options?.model ?? DEFAULT_MODEL
 
@@ -149,7 +163,7 @@ export const TAX_SYSTEM_PROMPT = `Ты — TaxBG AI, налоговый асси
 Актуальные данные 2026:
 - Корпоративен данък (ООД): 10%
 - ДДФЛ физически лица: 10%
-- Данък дивиденти: 7%
+- Данък дивиденти: 5% (ЗДДФЛ чл. 38 ал. 2)
 - ДДС: 20% (праг регистрации: ~51 130 €/год)
 - МРЗ: 620.20 €/мес.
 - Мин. осигурителен доход: ~551 €/мес.

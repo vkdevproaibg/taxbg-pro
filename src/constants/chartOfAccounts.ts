@@ -308,7 +308,7 @@ export const CHART_OF_ACCOUNTS: Account[] = [
     class: 9,
     type: 'passive',
     normalBalance: 'credit',
-    description_ru: 'Минимальный уставный капитал ООД - 2 лв. (≈ 1.02 EUR)',
+    description_ru: 'Минимальный уставный капитал ООД/ЕООД — 1.02 € (от 01.01.2026, еврозона)',
     examples_ru: ['Внесение уставного капитала при регистрации'],
   },
   {

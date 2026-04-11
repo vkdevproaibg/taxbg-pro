@@ -50,6 +50,20 @@ export function buildAuditReport(options: {
     hasEmployees, transactions, employees, eik,
   } = options
 
+  // Don't generate risks for unconfigured companies
+  if (!options.companyName.trim() || !options.eik.trim()) {
+    return {
+      generatedAt: new Date().toISOString(),
+      legalForm: options.legalForm,
+      companyName: options.companyName,
+      risks: [],
+      criticalCount: 0,
+      highCount: 0,
+      totalCount: 0,
+      healthScore: 100,
+    }
+  }
+
   const risks: Risk[] = []
   const now = new Date()
 
@@ -57,6 +71,10 @@ export function buildAuditReport(options: {
   const upcoming = getUpcomingEvents(CALENDAR_EVENTS_2026, legalForm, 30)
   const overdue = getOverdueEvents(CALENDAR_EVENTS_2026, legalForm)
 
+  // Don't generate deadline risks if no transactions yet
+  const hasAnyData = options.transactions.length > 0
+
+  if (hasAnyData) {
   for (const { event, daysUntil } of upcoming) {
     const level: RiskLevel =
       daysUntil <= 1  ? 'critical' :
@@ -96,6 +114,7 @@ export function buildAuditReport(options: {
       detectedAt: now.toISOString(),
     })
   }
+  } // end if (hasAnyData)
 
   // -- 2. VAT RISKS --
   if (hasVat) {
@@ -116,20 +135,39 @@ export function buildAuditReport(options: {
       })
     }
 
-    // Check VAT threshold approach
+  }
+
+  // Companies NOT yet VAT registered approaching threshold
+  if (!hasVat) {
+    const VAT_THRESHOLD = 51130  // ЗДДС чл. 96 ал. 1, EUR
+    const WARNING_LEVEL = VAT_THRESHOLD * 0.8  // 40 904 €
     const totalIncome = transactions
       .filter((t) => ['income', 'vat_out', 'appstore', 'googleplay', 'stripe'].includes(t.type))
       .reduce((s, t) => s + t.amount, 0)
 
-    if (!hasVat && totalIncome > 40000) {
+    if (totalIncome >= WARNING_LEVEL && totalIncome < VAT_THRESHOLD) {
       risks.push({
         id: 'vat-threshold-approaching',
         level: 'high',
         title: 'Приближение к порогу ДДС регистрации',
-        description: `Доход ${totalIncome.toFixed(0)} € - при превышении 51 130 € в год обязательна регистрация по ДДС в течение 7 дней.`,
-        legalBasis: 'ЗДДС чл. 96',
+        description: `Доход ${totalIncome.toFixed(0)} € приближается к порогу 51 130 €. При превышении необходимо зарегистрироваться по ДДС до его достижения.`,
+        legalBasis: 'ЗДДС чл. 96 ал. 1',
         penaltyAmount: '500-5 000 €',
-        suggestedAction: 'Следите за оборотом. При достижении 51 130 € подайте заявление в НАП в течение 7 дней. Несвоевременная регистрация - штраф плюс retroactive ДДС.',
+        suggestedAction: 'Следите за оборотом. При достижении 51 130 € подайте заявление о ДДС регистрации в НАП в течение 7 дней. Несвоевременная регистрация — штраф плюс retroactive ДДС.',
+        category: 'vat',
+        detectedAt: now.toISOString(),
+      })
+    }
+
+    if (totalIncome >= VAT_THRESHOLD) {
+      risks.push({
+        id: 'vat-threshold-exceeded',
+        level: 'critical',
+        title: 'Превышен порог ДДС — требуется немедленная регистрация',
+        description: `Доход ${totalIncome.toFixed(0)} € превысил 51 130 €. Вы обязаны зарегистрироваться по ДДС. Штраф за непроизведена регистрация: до 5 000 €.`,
+        legalBasis: 'ЗДДС чл. 96 ал. 1, чл. 180',
+        penaltyAmount: 'до 5 000 €',
+        suggestedAction: 'Немедленно подайте заявление о ДДС регистрации в НАП. Каждый день просрочки увеличивает риск санкций.',
         category: 'vat',
         detectedAt: now.toISOString(),
       })

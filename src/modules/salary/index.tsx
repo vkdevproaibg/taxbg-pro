@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSalary } from './useSalary'
 import { TAX_RATES_2026 } from '../../constants/tax-rates-2026'
+import { BgTermLabel } from '../../lib/bgTerms'
 
 export default function SalaryModule() {
   const min = TAX_RATES_2026.minWage.value
@@ -44,14 +45,16 @@ export default function SalaryModule() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: 'Нетна заплата', value: result.net, color: 'text-green-600' },
-          { label: 'Общ разход', value: result.totalCost, color: 'text-red-500' },
-          { label: 'Осигуровки работник', value: result.employeeContrib, color: 'text-orange-500' },
-          { label: 'Осигуровки работодател', value: result.employerContrib, color: 'text-orange-400' },
+          { key: 'net',       label: 'Нетна заплата',         termKey: null as string | null,      value: result.net,             color: 'text-green-600' },
+          { key: 'total',     label: 'Общ разход',            termKey: null as string | null,      value: result.totalCost,       color: 'text-red-500' },
+          { key: 'employee',  label: 'Осигуровки работник',   termKey: 'osigurovki_rabotnik',       value: result.employeeContrib, color: 'text-orange-500' },
+          { key: 'employer',  label: 'Осигуровки работодател', termKey: 'osigurovki_rabotodatel',   value: result.employerContrib, color: 'text-orange-400' },
         ].map(item => (
-          <div key={item.label} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div key={item.key} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
             <div className={`text-xl font-bold ${item.color}`}>{item.value.toFixed(2)} €</div>
-            <div className="mt-1 text-xs text-slate-400">{item.label}</div>
+            <div className="mt-1 text-xs text-slate-400">
+              {item.termKey ? <BgTermLabel termKey={item.termKey} /> : item.label}
+            </div>
           </div>
         ))}
       </div>

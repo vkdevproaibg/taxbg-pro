@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useReports } from './useReports'
 import DeclarationDDS from './forms/DeclarationDDS'
 import DeclarationZKPO from './forms/DeclarationZKPO'
@@ -6,12 +6,21 @@ import DeadlineGuide from './DeadlineGuide'
 
 const TABS = [
   { id: 'dds',  label: 'ДДС декларация',  sub: 'Месечна · до 14-то' },
-  { id: 'zkpo', label: 'ЗКПО декларация', sub: 'Годишна · до 30 април' },
+  { id: 'zkpo', label: 'ЗКПО декларация', sub: 'Годишна · до 30 юни' },
 ] as const
 
 export default function ReportsModule() {
   const [tab, setTab] = useState<'dds' | 'zkpo'>('dds')
   const r = useReports()
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { tab: t } = (e as CustomEvent).detail
+      if (t === 'dds' || t === 'zkpo') setTab(t)
+    }
+    window.addEventListener('tour:activate-tab', handler)
+    return () => window.removeEventListener('tour:activate-tab', handler)
+  }, [])
 
   return (
     <div className="space-y-5 p-6">

@@ -28,4 +28,5 @@ export interface ZKPOFormData {
   corporateTax: number
   advancePaid: number
   taxDue: number
+  overpaid?: number
 }

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -L -o /c/TaxBGpro/public/visa_d_blank.pdf https://www.mfa.bg/upload/2188/01_Application_Visa_RUS.PDF --max-time 30 -w '\\\\nHTTP %{http_code} | Size: %{size_download} bytes')",
+      "Bash(npm install:*)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(supabase db:*)",
+      "Bash(supabase link:*)",
+      "Bash(supabase status:*)"
+    ]
+  }
+}

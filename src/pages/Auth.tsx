@@ -1,8 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { enableLocalAdminSession } from '../hooks/useAuth'
+import { useAuthStore } from '../store/authStore'
 
 type Mode = 'login' | 'register' | 'reset'
+
+const ERROR_TRANSLATIONS: Record<string, string> = {
+  'Invalid login credentials':                 'Неверный email или пароль',
+  'Email not confirmed':                        'Подтвердите email — проверьте почту',
+  'User already registered':                    'Пользователь с таким email уже существует',
+  'Password should be at least 6 characters':  'Пароль должен быть не менее 6 символов',
+}
 
 export default function Auth() {
   const isDev = import.meta.env.DEV
@@ -12,6 +21,16 @@ export default function Auth() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
   const [success,  setSuccess]  = useState<string | null>(null)
+
+  const { signIn, signUp, isDemo, isLoading } = useAuthStore()
+  const navigate = useNavigate()
+
+  // Redirect when auth state settles to authenticated
+  useEffect(() => {
+    if (!isLoading && !isDemo) {
+      navigate('/')
+    }
+  }, [isDemo, isLoading, navigate])
 
   const reset = () => { setError(null); setSuccess(null) }
 
@@ -24,22 +43,26 @@ export default function Auth() {
   const handleSubmit = async () => {
     reset(); setLoading(true)
     try {
-      if (!supabase) throw new Error('Supabase не настроен')
       if (mode === 'register') {
-        const { error } = await supabase.auth.signUp({ email, password })
-        if (error) throw error
+        const errMsg = await signUp(email, password)
+        if (errMsg) throw new Error(errMsg)
         setSuccess('Письмо с подтверждением отправлено на ' + email)
+        setLoading(false)
       } else if (mode === 'reset') {
+        if (!supabase) throw new Error('Supabase не настроен')
         const { error } = await supabase.auth.resetPasswordForEmail(email)
         if (error) throw error
         setSuccess('Инструкции отправлены на ' + email)
+        setLoading(false)
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
+        const errMsg = await signIn(email, password)
+        if (errMsg) throw new Error(errMsg)
+        // Don't navigate manually — useEffect above watches isDemo
+        // loading stays true until auth state settles
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Ошибка авторизации')
-    } finally {
+      const msg = e instanceof Error ? e.message : 'Ошибка авторизации'
+      setError(ERROR_TRANSLATIONS[msg] ?? msg)
       setLoading(false)
     }
   }
@@ -199,7 +222,14 @@ export default function Auth() {
         </div>
 
         <p className="text-center text-xs mt-4" style={{ color: 'var(--text-muted)' }}>
-          Данные хранятся локально в вашем браузере
+          или{' '}
+          <button
+            onClick={() => navigate('/')}
+            className="underline"
+            style={{ color: 'var(--accent)' }}>
+            продолжить без входа
+          </button>
+          {' '}(демо-режим)
         </p>
       </div>
     </div>
