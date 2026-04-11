@@ -1,4 +1,5 @@
 import { CALENDAR_EVENTS_2026 } from '../constants/calendar-events'
+import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
 import { getRateValue } from './taxRates'
 import { getUpcomingEvents, getOverdueEvents } from './calendarUtils'
 import type { LegalForm } from '../store/userStore'
@@ -45,11 +46,13 @@ export function buildAuditReport(options: {
   employees: Employee[]
   eik: string
   pendingCorrectionsCount?: number
+  language?: string
 }): AuditReport {
   const {
     legalForm, companyName, hasVat,
     hasEmployees, transactions, employees, eik,
     pendingCorrectionsCount = 0,
+    language = 'ru',
   } = options
 
   // Don't generate risks for unconfigured companies
@@ -278,6 +281,98 @@ export function buildAuditReport(options: {
         `${pendingCorrectionsCount} непотвърдени корекции. ` +
         'Променена е данъчна ставка с обратна сила. Прегледайте и потвърдете корекцията.',
       suggestedAction: 'Отидете в Админ → Корекции и прегледайте.',
+      category: 'compliance',
+      detectedAt: now.toISOString(),
+    })
+  }
+
+  // -- 8. STALE TAX RATES --
+  const nextReview = TAX_RATES_2026._meta.nextReview
+  if (today > nextReview) {
+    const staleTitle: Record<string, string> = {
+      ru: 'Ставки не проверялись более 90 дней',
+      en: 'Tax rates not verified for 90+ days',
+      bg: 'Ставките не са проверявани повече от 90 дни',
+      uk: 'Ставки не перевірялись понад 90 днів',
+    }
+    const staleAction: Record<string, string> = {
+      ru: 'Проверьте актуальность налоговых ставок на nap.bg и обновите константы.',
+      en: 'Verify current tax rates at nap.bg and update the constants file.',
+      bg: 'Проверете актуалността на ставките в nap.bg и актуализирайте константите.',
+      uk: 'Перевірте актуальність ставок на nap.bg та оновіть константи.',
+    }
+    risks.push({
+      id: 'stale-tax-rates',
+      level: 'low',
+      title: staleTitle[language] ?? staleTitle['ru'],
+      description: `Последняя проверка: ${TAX_RATES_2026._meta.lastVerified}. Плановая проверка: ${nextReview}.`,
+      suggestedAction: staleAction[language] ?? staleAction['ru'],
+      category: 'compliance',
+      detectedAt: now.toISOString(),
+    })
+  }
+
+  // -- 9. EMPLOYEES WITHOUT EGN --
+  if (hasEmployees) {
+    const activeEmps = employees.filter(e => e.active)
+    const noEgn = activeEmps.filter(e => !e.egn || e.egn.trim() === '')
+    if (noEgn.length > 0) {
+      const egnTitle: Record<string, string> = {
+        ru: `Сотрудники без ЕГН: ${noEgn.length}`,
+        en: `Employees without EGN: ${noEgn.length}`,
+        bg: `Служители без ЕГН: ${noEgn.length}`,
+        uk: `Співробітники без ЄГН: ${noEgn.length}`,
+      }
+      const egnDesc: Record<string, string> = {
+        ru: 'Для подачи Образец 1 требуется ЕГН каждого сотрудника',
+        en: 'EGN is required for each employee to submit Образец 1',
+        bg: 'ЕГН е задължително за подаване на Образец 1',
+        uk: 'ЄГН необхідний для кожного співробітника для подачі Образец 1',
+      }
+      risks.push({
+        id: 'employees-no-egn',
+        level: 'medium',
+        title: egnTitle[language] ?? egnTitle['ru'],
+        description: egnDesc[language] ?? egnDesc['ru'],
+        suggestedAction: language === 'bg'
+          ? 'Добавете ЕГН на служителите в раздел Служители.'
+          : language === 'en'
+            ? 'Add employee EGN in the Employees section.'
+            : language === 'uk'
+              ? 'Додайте ЄГН співробітників у розділі Співробітники.'
+              : 'Добавьте ЕГН сотрудников в разделе Служители.',
+        category: 'compliance',
+        detectedAt: now.toISOString(),
+      })
+    }
+  }
+
+  // -- 10. ГФО PUBLICATION REMINDER (ООД, after June) --
+  if (legalForm === 'ood' && now.getMonth() + 1 > 6) {
+    const gfoTitle: Record<string, string> = {
+      ru: 'Проверьте публикацию ГФО в БРРА',
+      en: 'Check ГФО publication in BRRA',
+      bg: 'Проверете публикацията на ГФО в БРРА',
+      uk: 'Перевірте публікацію ГФО в БТРР',
+    }
+    const gfoDesc: Record<string, string> = {
+      ru: 'Годишен финансов отчет за предходната година трябва да е публикуван до 30 юни',
+      en: 'Annual financial report for the previous year must be published by 30 June',
+      bg: 'Годишен финансов отчет за предходната година трябва да е публикуван до 30 юни',
+      uk: 'Річний фінансовий звіт за попередній рік має бути опублікований до 30 червня',
+    }
+    risks.push({
+      id: 'gfo-publication-reminder',
+      level: 'info',
+      title: gfoTitle[language] ?? gfoTitle['ru'],
+      description: gfoDesc[language] ?? gfoDesc['ru'],
+      suggestedAction: language === 'bg'
+        ? 'Влезте в brra.bg и проверете дали ГФО за миналата година е публикуван.'
+        : language === 'en'
+          ? 'Log in to brra.bg and verify the previous year ГФО is published.'
+          : language === 'uk'
+            ? 'Увійдіть на brra.bg і перевірте публікацію ГФО за минулий рік.'
+            : 'Зайдите на brra.bg и проверьте, опубликован ли ГФО за прошлый год.',
       category: 'compliance',
       detectedAt: now.toISOString(),
     })

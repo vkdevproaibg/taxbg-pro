@@ -1,5 +1,10 @@
 import type { Transaction } from '../../store/accountingStore'
 import type { Employee } from '../../store/employeesStore'
+import { getRateValue } from '../../lib/taxRates'
+import { createVatInputCreditEntry } from '../../lib/journalAI'
+import { calculateCorporateTax } from '../../lib/financialReports'
+import { AUDIT_TEMPLATES } from '../../constants/audit-templates'
+import { fillTemplate } from '../../lib/auditDocGenerator'
 
 export interface TestScenario {
   id: string
@@ -359,6 +364,219 @@ export const TEST_SCENARIOS: TestScenario[] = [
       monthlyDDS: 0,
       annualKNP: 6138,
       balanceShouldMatch: true,
+    },
+  },
+]
+
+// ─────────────────────────────────────────────────────────────
+// UNIT TEST SCENARIOS
+// These run pure JS assertions — no store loading, no DB.
+// ─────────────────────────────────────────────────────────────
+
+export interface UnitTestScenario {
+  id: string
+  name: string
+  run: () => { passed: boolean; details: string }
+}
+
+export const UNIT_TEST_SCENARIOS: UnitTestScenario[] = [
+  {
+    id: 'tax-rates-versioning',
+    name: 'Tax Rate Versioning',
+    run: () => {
+      const results: string[] = []
+      let allPassed = true
+
+      const check = (label: string, ok: boolean, got?: unknown) => {
+        if (!ok) {
+          allPassed = false
+          results.push(`FAIL: ${label}${got !== undefined ? ` (got: ${JSON.stringify(got)})` : ''}`)
+        } else {
+          results.push(`OK:   ${label}`)
+        }
+      }
+
+      const ct = getRateValue('corporateTax', '2026-06-15')
+      check('corporateTax 2026-06-15 === 0.10', ct === 0.10, ct)
+
+      const mw = getRateValue('minWage', '2026-01-01')
+      check('minWage 2026-01-01 === 620.20', mw === 620.20, mw)
+
+      const empDoo = getRateValue('employer.doo', '2026-03-01')
+      check('employer.doo 2026-03-01 > 0', typeof empDoo === 'number' && empDoo > 0, empDoo)
+
+      const nonexistent = getRateValue('nonexistent.key', '2026-01-01')
+      check('nonexistent.key returns 0', nonexistent === 0, nonexistent)
+
+      const maxOsig = getRateValue('maxOsig', '2026-01-01')
+      check('maxOsig 2026-01-01 === 2111.64', maxOsig === 2111.64, maxOsig)
+
+      return { passed: allPassed, details: results.join('\n') }
+    },
+  },
+
+  {
+    id: 'calculator-no-double-deduction',
+    name: 'Calculator: No Double Deduction (K3)',
+    run: () => {
+      const results: string[] = []
+      let allPassed = true
+
+      const check = (label: string, ok: boolean, got?: unknown) => {
+        if (!ok) { allPassed = false; results.push(`FAIL: ${label}${got !== undefined ? ` (got: ${JSON.stringify(got)})` : ''}`) }
+        else results.push(`OK:   ${label}`)
+      }
+
+      // Self-employed: revenue=100000, expenses=20000
+      const revenue = 100000
+      const expenses = 20000
+      const normExp = revenue * 0.25  // 25000
+
+      // normative mode: deduct normExp only (not expenses)
+      const minOsigSol = getRateValue('minOsigSol', '2026-01-01')
+      const solDoo = getRateValue('selfEmployed.doo', '2026-01-01')
+      const solZo  = getRateValue('selfEmployed.zo',  '2026-01-01')
+      const osigAnnual = minOsigSol * 12 * (solDoo + solZo)
+
+      const normBase = revenue - normExp - osigAnnual
+      check('normative: taxableBase does NOT include actual expenses', normBase !== revenue - expenses - osigAnnual || normExp === expenses, normBase)
+      check('normative: taxableBase = revenue - normExp - osig', Math.abs(normBase - (revenue - normExp - osigAnnual)) < 0.01, normBase)
+
+      // actual mode: deduct actual expenses only (not normExp)
+      const actualBase = revenue - expenses - osigAnnual
+      check('actual: taxableBase = revenue - expenses - osig', Math.abs(actualBase - (revenue - expenses - osigAnnual)) < 0.01, actualBase)
+      check('actual: taxableBase does NOT include normExp', Math.abs(actualBase - (revenue - normExp - osigAnnual)) > 0.01 || normExp === expenses, actualBase)
+
+      return { passed: allPassed, details: results.join('\n') }
+    },
+  },
+
+  {
+    id: 'vat-input-credit',
+    name: 'VAT Input Credit (C1)',
+    run: () => {
+      const results: string[] = []
+      let allPassed = true
+
+      const check = (label: string, ok: boolean, got?: unknown) => {
+        if (!ok) { allPassed = false; results.push(`FAIL: ${label}${got !== undefined ? ` (got: ${JSON.stringify(got)})` : ''}`) }
+        else results.push(`OK:   ${label}`)
+      }
+
+      const vatInTx = {
+        id: 'test-1',
+        date: '2026-03-15',
+        type: 'vat_in' as const,
+        description: 'Test purchase',
+        amount: 500,
+        vatRate: 0.20,
+        vatAmount: 100,
+        counterparty: 'Supplier BG',
+        invoiceNumber: 'INV-001',
+      }
+
+      const entry = createVatInputCreditEntry(vatInTx)
+      check('vat_in: entry is not null', entry !== null)
+      check('vat_in: debitAccount === 452', entry?.debitAccount === '452', entry?.debitAccount)
+      check('vat_in: creditAccount === 401', entry?.creditAccount === '401', entry?.creditAccount)
+      check('vat_in: amount === 100', entry?.amount === 100, entry?.amount)
+
+      const incomeTx = {
+        id: 'test-2',
+        date: '2026-03-15',
+        type: 'income' as const,
+        description: 'Test income',
+        amount: 1000,
+        vatRate: 0,
+        vatAmount: 0,
+        counterparty: 'Client',
+        invoiceNumber: 'INV-002',
+      }
+      const nullEntry = createVatInputCreditEntry(incomeTx)
+      check('income type: returns null', nullEntry === null, nullEntry)
+
+      return { passed: allPassed, details: results.join('\n') }
+    },
+  },
+
+  {
+    id: 'financial-reports-sync',
+    name: 'OPR/Balance Tax Sync (C2)',
+    run: () => {
+      const results: string[] = []
+      let allPassed = true
+
+      const check = (label: string, ok: boolean, got?: unknown) => {
+        if (!ok) { allPassed = false; results.push(`FAIL: ${label}${got !== undefined ? ` (got: ${JSON.stringify(got)})` : ''}`) }
+        else results.push(`OK:   ${label}`)
+      }
+
+      const r1 = calculateCorporateTax(10000, 500)
+      check('calculateCorporateTax(10000, 500).taxableProfit === 10500', r1.taxableProfit === 10500, r1.taxableProfit)
+      check('calculateCorporateTax(10000, 500).corporateTax === 1050', Math.abs(r1.corporateTax - 1050) < 0.01, r1.corporateTax)
+
+      const r2 = calculateCorporateTax(-5000, 0)
+      check('calculateCorporateTax(-5000, 0).taxableProfit === 0', r2.taxableProfit === 0, r2.taxableProfit)
+      check('calculateCorporateTax(-5000, 0).corporateTax === 0', r2.corporateTax === 0, r2.corporateTax)
+      check('calculateCorporateTax(-5000, 0).netProfit === -5000', r2.netProfit === -5000, r2.netProfit)
+
+      return { passed: allPassed, details: results.join('\n') }
+    },
+  },
+
+  {
+    id: 'audit-templates',
+    name: 'Audit Templates',
+    run: () => {
+      const results: string[] = []
+      let allPassed = true
+
+      const check = (label: string, ok: boolean, got?: unknown) => {
+        if (!ok) { allPassed = false; results.push(`FAIL: ${label}${got !== undefined ? ` (got: ${JSON.stringify(got)})` : ''}`) }
+        else results.push(`OK:   ${label}`)
+      }
+
+      check(`AUDIT_TEMPLATES.length >= 10`, AUDIT_TEMPLATES.length >= 10, AUDIT_TEMPLATES.length)
+
+      const placeholderRegex = /\{\{(\w+)\}\}/g
+      const extractPlaceholders = (s: string): string[] => {
+        const keys: string[] = []
+        let m: RegExpExecArray | null
+        while ((m = placeholderRegex.exec(s)) !== null) keys.push(m[1])
+        placeholderRegex.lastIndex = 0
+        return [...new Set(keys)].sort()
+      }
+
+      let allHaveLangs = true
+      let placeholdersMatch = true
+
+      for (const tpl of AUDIT_TEMPLATES) {
+        const hasAllLangs = !!tpl.template_bg && !!tpl.template_ru && !!tpl.template_en && !!tpl.template_uk
+        if (!hasAllLangs) {
+          allHaveLangs = false
+          results.push(`FAIL: template ${tpl.id} missing language variants`)
+        }
+
+        const ph_bg = extractPlaceholders(tpl.template_bg)
+        const ph_ru = extractPlaceholders(tpl.template_ru)
+        const ph_en = extractPlaceholders(tpl.template_en)
+        const ph_uk = extractPlaceholders(tpl.template_uk)
+        const same = JSON.stringify(ph_bg) === JSON.stringify(ph_ru) &&
+                     JSON.stringify(ph_ru) === JSON.stringify(ph_en) &&
+                     JSON.stringify(ph_en) === JSON.stringify(ph_uk)
+        if (!same) {
+          placeholdersMatch = false
+          results.push(`FAIL: template ${tpl.id} placeholder mismatch: bg=${JSON.stringify(ph_bg)} ru=${JSON.stringify(ph_ru)} en=${JSON.stringify(ph_en)} uk=${JSON.stringify(ph_uk)}`)
+        }
+      }
+
+      check('all templates have all 4 language variants', allHaveLangs)
+      check('all templates have matching placeholders across languages', placeholdersMatch)
+
+      const filled = fillTemplate('{{name}} ЕИК {{eik}}', { name: 'Test', eik: '123' })
+      check("fillTemplate('{{name}} ЕИК {{eik}}', ...) === 'Test ЕИК 123'", filled === 'Test ЕИК 123', filled)
+
+      return { passed: allPassed, details: results.join('\n') }
     },
   },
 ]

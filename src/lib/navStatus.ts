@@ -7,19 +7,23 @@ import { useAccountingStore } from '../store/accountingStore'
 import { useJournalStore }    from '../store/journalStore'
 import { useEmployeesStore }  from '../store/employeesStore'
 import { useCompaniesStore }  from '../store/companiesStore'
+import { useAuthStore }       from '../store/authStore'
+import { useLegislationStore } from '../store/legislationStore'
 import { buildBalanceSheet }  from './financialReports'
 
 export type NavStatus = 'green' | 'yellow' | 'red' | 'none'
 
 export interface NavStatusMap {
-  dashboard:  NavStatus
-  accounting: NavStatus
-  reports:    NavStatus
-  calendar:   NavStatus
-  employees:  NavStatus
-  salary:     NavStatus
-  auditor:    NavStatus
-  companies:  NavStatus
+  dashboard:   NavStatus
+  accounting:  NavStatus
+  reports:     NavStatus
+  calendar:    NavStatus
+  employees:   NavStatus
+  salary:      NavStatus
+  auditor:     NavStatus
+  companies:   NavStatus
+  'audit-help': NavStatus
+  superadmin:  NavStatus
 }
 
 /** Returns red if overdue, yellow if within warningDays, green otherwise. */
@@ -37,6 +41,10 @@ export function useNavStatus(): NavStatusMap {
   const entries      = useJournalStore(s => s.entries)
   const employees    = useEmployeesStore(s => s.employees)
   const company      = useCompaniesStore(s => s.getActive())
+  const isSuperAdmin = useAuthStore(s => s.isSuperAdmin())
+  const pendingAlerts = useLegislationStore(s =>
+    s.alerts.filter(a => a.status === 'pending')
+  )
 
   const now   = new Date()
   const year  = now.getFullYear()
@@ -111,22 +119,34 @@ export function useNavStatus(): NavStatusMap {
     calendarStatus === 'red'    ? 'red'    :
     calendarStatus === 'yellow' ? 'yellow' : 'green'
 
+  // ── Audit Help ───────────────────────────────────────────
+  // Informational page — no action required
+  const auditHelpStatus: NavStatus = 'none'
+
+  // ── SuperAdmin ───────────────────────────────────────────
+  const superadminStatus: NavStatus = isSuperAdmin
+    ? (pendingAlerts.length > 0 ? 'yellow' : 'green')
+    : 'none'
+
   // ── Dashboard — worst of all sections ───────────────────
   const allStatuses: NavStatus[] = [
     accountingStatus, reportsStatus, calendarStatus, auditorStatus,
+    ...(isSuperAdmin ? [superadminStatus] : []),
   ]
   const dashboardStatus: NavStatus =
     allStatuses.includes('red')    ? 'red'    :
     allStatuses.includes('yellow') ? 'yellow' : 'green'
 
   return {
-    dashboard:  dashboardStatus,
-    accounting: accountingStatus,
-    reports:    reportsStatus,
-    calendar:   calendarStatus,
-    employees:  employeesStatus,
-    salary:     salaryStatus,
-    auditor:    auditorStatus,
-    companies:  companiesStatus,
+    dashboard:   dashboardStatus,
+    accounting:  accountingStatus,
+    reports:     reportsStatus,
+    calendar:    calendarStatus,
+    employees:   employeesStatus,
+    salary:      salaryStatus,
+    auditor:     auditorStatus,
+    companies:   companiesStatus,
+    'audit-help': auditHelpStatus,
+    superadmin:  superadminStatus,
   }
 }

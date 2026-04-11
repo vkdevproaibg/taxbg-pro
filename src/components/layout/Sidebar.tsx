@@ -75,6 +75,7 @@ const STATUS_KEYS: Record<string, keyof ReturnType<typeof useNavStatus>> = {
   nav_salary:     'salary',
   nav_auditor:    'auditor',
   nav_companies:  'companies',
+  nav_audit_help: 'audit-help',
 }
 
 export default function Sidebar() {
