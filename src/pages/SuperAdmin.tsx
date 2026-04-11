@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '../store/authStore'
+import { useUserStore } from '../store/userStore'
+import { useLegislationStore } from '../store/legislationStore'
+import LegislationTab from '../modules/superadmin/LegislationTab'
 import {
   fetchAdminStats,
   fetchAuditEvents,
@@ -9,10 +12,123 @@ import {
   type AuditEvent,
 } from '../lib/supabaseAdmin'
 
-type AdminTab = 'stats' | 'users' | 'logs'
+type AdminTab = 'stats' | 'users' | 'logs' | 'legislation'
+
+const T = {
+  ru: {
+    accessDenied: 'Доступ запрещён',
+    accessDeniedDesc: 'Эта страница доступна только супер-администратору',
+    pageTitle: 'Супер-Админ',
+    adminOnly: 'ADMIN ONLY',
+    refresh: '↻ Обновить',
+    loading: 'Загрузка...',
+    tabStats: 'Статистика',
+    tabUsers: 'Пользователи',
+    tabLogs: 'Аудит лог',
+    tabLegislation: 'Законодательство',
+    totalUsers: 'Всего пользователей',
+    proUsers: 'Pro подписок',
+    freeUsers: 'Free пользователей',
+    totalCompanies: 'Всего компаний',
+    activeCompanies: 'Активных компаний',
+    totalTransactions: 'Транзакций',
+    recentEvents: 'Событий за 24ч',
+    updatedAt: 'Обновлено',
+    usersRecent: 'Последние',
+    usersByDate: 'пользователей (по дате регистрации)',
+    noData: 'Нет данных',
+    logsRecent: 'Последние',
+    logsEvents: 'событий',
+    noEvents: 'Нет событий',
+  },
+  en: {
+    accessDenied: 'Access denied',
+    accessDeniedDesc: 'This page is for super admins only',
+    pageTitle: 'Super Admin',
+    adminOnly: 'ADMIN ONLY',
+    refresh: '↻ Refresh',
+    loading: 'Loading...',
+    tabStats: 'Stats',
+    tabUsers: 'Users',
+    tabLogs: 'Audit log',
+    tabLegislation: 'Legislation',
+    totalUsers: 'Total users',
+    proUsers: 'Pro subscriptions',
+    freeUsers: 'Free users',
+    totalCompanies: 'Total companies',
+    activeCompanies: 'Active companies',
+    totalTransactions: 'Transactions',
+    recentEvents: 'Events (24h)',
+    updatedAt: 'Updated',
+    usersRecent: 'Latest',
+    usersByDate: 'users (by signup date)',
+    noData: 'No data',
+    logsRecent: 'Latest',
+    logsEvents: 'events',
+    noEvents: 'No events',
+  },
+  bg: {
+    accessDenied: 'Достъпът е отказан',
+    accessDeniedDesc: 'Тази страница е достъпна само за супер-администратори',
+    pageTitle: 'Супер-Админ',
+    adminOnly: 'ADMIN ONLY',
+    refresh: '↻ Обнови',
+    loading: 'Зареждане...',
+    tabStats: 'Статистика',
+    tabUsers: 'Потребители',
+    tabLogs: 'Одит лог',
+    tabLegislation: 'Законодателство',
+    totalUsers: 'Общо потребители',
+    proUsers: 'Pro абонаменти',
+    freeUsers: 'Free потребители',
+    totalCompanies: 'Общо компании',
+    activeCompanies: 'Активни компании',
+    totalTransactions: 'Транзакции',
+    recentEvents: 'Събития (24ч)',
+    updatedAt: 'Обновено',
+    usersRecent: 'Последни',
+    usersByDate: 'потребители (по дата на регистрация)',
+    noData: 'Няма данни',
+    logsRecent: 'Последни',
+    logsEvents: 'събития',
+    noEvents: 'Няма събития',
+  },
+  uk: {
+    accessDenied: 'Доступ заборонено',
+    accessDeniedDesc: 'Ця сторінка доступна лише супер-адміністраторам',
+    pageTitle: 'Супер-Адмін',
+    adminOnly: 'ADMIN ONLY',
+    refresh: '↻ Оновити',
+    loading: 'Завантаження...',
+    tabStats: 'Статистика',
+    tabUsers: 'Користувачі',
+    tabLogs: 'Аудит лог',
+    tabLegislation: 'Законодавство',
+    totalUsers: 'Всього користувачів',
+    proUsers: 'Pro підписок',
+    freeUsers: 'Free користувачів',
+    totalCompanies: 'Всього компаній',
+    activeCompanies: 'Активних компаній',
+    totalTransactions: 'Транзакцій',
+    recentEvents: 'Подій за 24г',
+    updatedAt: 'Оновлено',
+    usersRecent: 'Останні',
+    usersByDate: 'користувачів (за датою реєстрації)',
+    noData: 'Немає даних',
+    logsRecent: 'Останні',
+    logsEvents: 'подій',
+    noEvents: 'Немає подій',
+  },
+}
 
 export default function SuperAdmin() {
   const { profile } = useAuthStore()
+  const language = useUserStore(s => s.language) || 'ru'
+  const labels = T[language] ?? T.ru
+
+  const loadLegislationAlerts = useLegislationStore(s => s.loadAlerts)
+  const legislationLoaded = useLegislationStore(s => s.isLoaded)
+  const pendingAlerts = useLegislationStore(s => s.getPendingCount())
 
   // Access guard — hard wall, not a redirect
   if (profile?.role !== 'superadmin') {
@@ -22,11 +138,11 @@ export default function SuperAdmin() {
           <p className="text-5xl">🚫</p>
           <p className="text-lg font-semibold"
             style={{ color: 'var(--text-primary)' }}>
-            Доступ запрещён
+            {labels.accessDenied}
           </p>
           <p className="text-sm"
             style={{ color: 'var(--text-muted)' }}>
-            Эта страница доступна только супер-администратору
+            {labels.accessDeniedDesc}
           </p>
         </div>
       </div>
@@ -56,10 +172,16 @@ export default function SuperAdmin() {
 
   useEffect(() => { load() }, [])
 
-  const TABS: { id: AdminTab; label: string; icon: string }[] = [
-    { id: 'stats', label: 'Статистика',    icon: '📊' },
-    { id: 'users', label: 'Пользователи', icon: '👥' },
-    { id: 'logs',  label: 'Аудит лог',    icon: '📋' },
+  // Lazy-load legislation alerts on first mount of SuperAdmin page
+  useEffect(() => {
+    if (!legislationLoaded) loadLegislationAlerts()
+  }, [legislationLoaded, loadLegislationAlerts])
+
+  const TABS: { id: AdminTab; label: string; icon: string; badge?: number }[] = [
+    { id: 'stats',       label: labels.tabStats,       icon: '📊' },
+    { id: 'users',       label: labels.tabUsers,       icon: '👥' },
+    { id: 'logs',        label: labels.tabLogs,        icon: '📋' },
+    { id: 'legislation', label: labels.tabLegislation, icon: '📜', badge: pendingAlerts },
   ]
 
   return (
@@ -77,13 +199,13 @@ export default function SuperAdmin() {
               className="text-xl font-semibold"
               style={{ color: 'var(--text-primary)' }}
             >
-              Супер-Админ
+              {labels.pageTitle}
             </h1>
             <span
               className="rounded-full px-2 py-0.5 text-xs font-bold tracking-wide"
               style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}
             >
-              ADMIN ONLY
+              {labels.adminOnly}
             </span>
           </div>
 
@@ -96,7 +218,7 @@ export default function SuperAdmin() {
               color: 'var(--text-secondary)',
             }}
           >
-            {loading ? '...' : '↻ Обновить'}
+            {loading ? '...' : labels.refresh}
           </button>
         </div>
 
@@ -105,7 +227,7 @@ export default function SuperAdmin() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className="px-4 py-2 text-sm font-medium transition-colors"
+              className="px-4 py-2 text-sm font-medium transition-colors flex items-center gap-1.5"
               style={{
                 borderBottom: tab === t.id
                   ? '2px solid var(--accent)'
@@ -115,7 +237,15 @@ export default function SuperAdmin() {
                   : 'var(--text-muted)',
               }}
             >
-              {t.icon} {t.label}
+              <span>{t.icon} {t.label}</span>
+              {t.badge !== undefined && t.badge > 0 && (
+                <span
+                  className="inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none min-w-[18px]"
+                  style={{ backgroundColor: '#f59e0b', color: 'white' }}
+                >
+                  {t.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -124,9 +254,9 @@ export default function SuperAdmin() {
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
 
-        {loading && (
+        {loading && tab !== 'legislation' && (
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Загрузка...
+            {labels.loading}
           </p>
         )}
 
@@ -135,13 +265,13 @@ export default function SuperAdmin() {
           <div className="space-y-6 max-w-2xl">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {[
-                { label: 'Всего пользователей', value: stats.totalUsers,        icon: '👥' },
-                { label: 'Pro подписок',         value: stats.proUsers,          icon: '💎' },
-                { label: 'Free пользователей',   value: stats.freeUsers,         icon: '🔓' },
-                { label: 'Всего компаний',        value: stats.totalCompanies,    icon: '🏢' },
-                { label: 'Активных компаний',     value: stats.activeCompanies,   icon: '✅' },
-                { label: 'Транзакций',            value: stats.totalTransactions, icon: '📊' },
-                { label: 'Событий за 24ч',        value: stats.recentAuditEvents, icon: '🔔' },
+                { label: labels.totalUsers,        value: stats.totalUsers,        icon: '👥' },
+                { label: labels.proUsers,          value: stats.proUsers,          icon: '💎' },
+                { label: labels.freeUsers,         value: stats.freeUsers,         icon: '🔓' },
+                { label: labels.totalCompanies,    value: stats.totalCompanies,    icon: '🏢' },
+                { label: labels.activeCompanies,   value: stats.activeCompanies,   icon: '✅' },
+                { label: labels.totalTransactions, value: stats.totalTransactions, icon: '📊' },
+                { label: labels.recentEvents,      value: stats.recentAuditEvents, icon: '🔔' },
               ].map(item => (
                 <div
                   key={item.label}
@@ -165,7 +295,7 @@ export default function SuperAdmin() {
               ))}
             </div>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Обновлено: {refreshedAt.toLocaleTimeString()}
+              {labels.updatedAt}: {refreshedAt.toLocaleTimeString()}
             </p>
           </div>
         )}
@@ -174,12 +304,12 @@ export default function SuperAdmin() {
         {!loading && tab === 'users' && (
           <div className="max-w-3xl space-y-2">
             <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-              Последние {users.length} пользователей (по дате регистрации)
+              {labels.usersRecent} {users.length} {labels.usersByDate}
             </p>
 
             {users.length === 0 && (
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Нет данных
+                {labels.noData}
               </p>
             )}
 
@@ -239,12 +369,12 @@ export default function SuperAdmin() {
         {!loading && tab === 'logs' && (
           <div className="max-w-3xl space-y-2">
             <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-              Последние {logs.length} событий
+              {labels.logsRecent} {logs.length} {labels.logsEvents}
             </p>
 
             {logs.length === 0 && (
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Нет событий
+                {labels.noEvents}
               </p>
             )}
 
@@ -297,6 +427,9 @@ export default function SuperAdmin() {
             ))}
           </div>
         )}
+
+        {/* ── Legislation ── */}
+        {tab === 'legislation' && <LegislationTab />}
 
       </div>
     </div>

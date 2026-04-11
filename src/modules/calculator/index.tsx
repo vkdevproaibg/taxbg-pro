@@ -4,10 +4,35 @@ import { useCalculator } from './useCalculator'
 import type { LegalFormCalc, ExpenseMode } from './useCalculator'
 import DividendCalculator from './DividendCalculator'
 
+const T = {
+  ru: {
+    expenseModeLabel: 'Режим расходов (ЗДДФЛ чл. 29)',
+    normative: 'Нормативные 25% — без документов',
+    actual: 'Фактические расходы — по фактурам',
+  },
+  en: {
+    expenseModeLabel: 'Expense mode (ZDDFL art. 29)',
+    normative: 'Normative 25% — no documents',
+    actual: 'Actual expenses — with invoices',
+  },
+  bg: {
+    expenseModeLabel: 'Вид разходи (ЗДДФЛ чл. 29)',
+    normative: 'Нормативни 25% — без документи',
+    actual: 'Реални разходи — с фактури',
+  },
+  uk: {
+    expenseModeLabel: 'Режим витрат (ЗДДФЛ ст. 29)',
+    normative: 'Нормативні 25% — без документів',
+    actual: 'Фактичні витрати — за рахунками',
+  },
+}
+
 type CalcTab = 'tax' | 'dividend'
 
 export default function CalculatorModule() {
   const [tab, setTab] = useState<CalcTab>('tax')
+  const language = useUserStore((s) => s.language) || 'ru'
+  const labels = T[language] ?? T.ru
   const legalFormStore = useUserStore((s) => s.legalForm)
   const initForm: LegalFormCalc = legalFormStore === 'ood' ? 'ood' : 'self'
 
@@ -77,7 +102,7 @@ export default function CalculatorModule() {
 
         {legalForm === 'self' && (
           <div>
-            <label className="mb-1 block text-xs text-slate-400">Вид разходи (ЗДДФЛ чл. 29)</label>
+            <label className="mb-1 block text-xs text-slate-400">{labels.expenseModeLabel}</label>
             <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
               <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
                 <input
@@ -87,7 +112,7 @@ export default function CalculatorModule() {
                   checked={expenseMode === 'normative'}
                   onChange={() => setExpenseMode('normative')}
                 />
-                Нормативни 25% — без документи
+                {labels.normative}
               </label>
               <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
                 <input
@@ -97,7 +122,7 @@ export default function CalculatorModule() {
                   checked={expenseMode === 'actual'}
                   onChange={() => setExpenseMode('actual')}
                 />
-                Реални разходи — с фактури
+                {labels.actual}
               </label>
             </div>
           </div>

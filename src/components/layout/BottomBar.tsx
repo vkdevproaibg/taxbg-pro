@@ -2,10 +2,21 @@ import { NavLink } from 'react-router-dom'
 import { Settings } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { useAuthStore } from '../../store/authStore'
+import { useUserStore } from '../../store/userStore'
+import { useLegislationStore } from '../../store/legislationStore'
+
+const ADMIN_LABEL: Record<string, string> = {
+  ru: 'Админ',
+  en: 'Admin',
+  bg: 'Админ',
+  uk: 'Адмін',
+}
 
 export default function BottomBar() {
   const t = useT()
   const { profile } = useAuthStore()
+  const language = useUserStore(s => s.language) || 'ru'
+  const pendingAlerts = useLegislationStore(s => s.getPendingCount())
   const currentYear = new Date().getFullYear()
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -79,7 +90,15 @@ export default function BottomBar() {
               })}
             >
               <span className="text-sm leading-none">⚡</span>
-              <span>Админ</span>
+              <span>{ADMIN_LABEL[language] ?? ADMIN_LABEL.ru}</span>
+              {pendingAlerts > 0 && (
+                <span
+                  className="inline-flex items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none min-w-[16px] h-[16px]"
+                  style={{ backgroundColor: '#f59e0b', color: 'white' }}
+                >
+                  {pendingAlerts}
+                </span>
+              )}
             </NavLink>
           )}
         </div>
