@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useUserStore } from '../../store/userStore'
+import NotificationBell from '../ui/NotificationBell'
 
 function UserMenu() {
   const { user, profile, isDemo, signOut } = useAuthStore()
@@ -73,8 +74,11 @@ export default function Topbar() {
           )}
         </div>
 
-        {/* User menu */}
-        <UserMenu />
+        {/* Right side: notifications + user menu */}
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <UserMenu />
+        </div>
       </div>
     </header>
   )

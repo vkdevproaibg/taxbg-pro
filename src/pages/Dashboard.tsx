@@ -1,12 +1,14 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCompanyDataReady } from '../hooks/useCompanyData'
+import { useCompanyRole } from '../hooks/useCompanyRole'
 import { useUserStore } from '../store/userStore'
 import { useEntryAuditStore } from '../store/entryAuditStore'
 import { useAccountingStore } from '../store/accountingStore'
 import { useEmployeesStore } from '../store/employeesStore'
 import { useCompaniesStore } from '../store/companiesStore'
 import { useLegislationStore } from '../store/legislationStore'
+import { useNotificationsStore } from '../store/notificationsStore'
 import { CALENDAR_EVENTS_2026 } from '../constants/calendar-events'
 import { TAX_RATES_2026 } from '../constants/tax-rates-2026'
 import { buildAuditReport } from '../lib/riskEngine'
@@ -32,6 +34,15 @@ export default function Dashboard() {
   const pendingCorrectionsCount = useLegislationStore((s) =>
     activeCompanyId ? s.getPendingCorrectionsCount(activeCompanyId) : 0,
   )
+  const notifications = useNotificationsStore((s) => s.notifications)
+  const urgentNotifications = notifications
+    .filter((n) => !n.dismissedAt && (n.severity === 'critical' || n.severity === 'warning'))
+    .sort((a, b) => {
+      const order = { critical: 0, warning: 1, info: 2 }
+      return order[a.severity] - order[b.severity]
+    })
+    .slice(0, 3)
+  const hasCritical = urgentNotifications.some((n) => n.severity === 'critical')
   const navigate     = useNavigate()
   const r            = TAX_RATES_2026
 
@@ -48,6 +59,8 @@ export default function Dashboard() {
   const { getUnresolvedCritical, auditCompleted, path: entryPath, entryDate } = useEntryAuditStore()
   const unresolvedCritical = getUnresolvedCritical()
   const dataReady = useCompanyDataReady()
+  const { canApprove, needsApproval } = useCompanyRole()
+  const pendingTransactions = useAccountingStore((s) => s.getPendingTransactions())
 
   const totalIn  = transactions
     .filter((t) => ['income','vat_out','appstore','googleplay','stripe'].includes(t.type))
@@ -66,6 +79,85 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 p-6">
+
+      {/* Urgent notifications block */}
+      {urgentNotifications.length > 0 && (
+        <div
+          className="rounded-xl p-4"
+          style={{
+            backgroundColor: hasCritical ? 'var(--danger-light)' : '#fffbeb',
+            border: `1.5px solid ${hasCritical ? 'var(--danger)' : '#f59e0b'}`,
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold" style={{ color: hasCritical ? 'var(--danger-text)' : '#92400e' }}>
+              {hasCritical ? '🔔' : '⏰'}{' '}
+              {{
+                ru: 'Срочные напоминания',
+                en: 'Urgent reminders',
+                bg: 'Спешни напомняния',
+                uk: 'Термінові нагадування',
+              }[language] ?? 'Срочные напоминания'}
+            </p>
+            <button
+              onClick={() => navigate('/calendar')}
+              className="shrink-0 text-xs font-semibold hover:underline"
+              style={{ color: hasCritical ? 'var(--danger-text)' : '#92400e' }}
+            >
+              {{
+                ru: 'Все дедлайны →',
+                en: 'All deadlines →',
+                bg: 'Всички срокове →',
+                uk: 'Усі терміни →',
+              }[language] ?? 'Все дедлайны →'}
+            </button>
+          </div>
+          <div className="mt-3 space-y-1.5">
+            {urgentNotifications.map((n) => (
+              <div key={n.id} className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                <span
+                  className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: n.severity === 'critical' ? 'var(--danger)' : '#f59e0b',
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {n.title}
+                  </span>
+                  <span className="mx-1">·</span>
+                  <span>{n.description}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pending approval card */}
+      {canApprove && needsApproval && pendingTransactions.length > 0 && (
+        <div
+          className="rounded-xl p-4 flex items-center justify-between gap-3"
+          style={{ backgroundColor: 'var(--warning-light, #fffbeb)', border: '1.5px solid #f59e0b' }}
+        >
+          <div>
+            <p className="font-semibold text-sm text-amber-800">
+              {{
+                ru: `${pendingTransactions.length} транзакц${pendingTransactions.length === 1 ? 'ия' : pendingTransactions.length < 5 ? 'ии' : 'ий'} ожидают утверждения`,
+                en: `${pendingTransactions.length} transaction${pendingTransactions.length !== 1 ? 's' : ''} awaiting approval`,
+                bg: `${pendingTransactions.length} транзакц${pendingTransactions.length === 1 ? 'ия' : 'ии'} чак${pendingTransactions.length === 1 ? 'а' : 'ат'} одобрение`,
+                uk: `${pendingTransactions.length} транзакц${pendingTransactions.length === 1 ? 'ія' : pendingTransactions.length < 5 ? 'ії' : 'ій'} очікують затвердження`,
+              }[language] ?? `${pendingTransactions.length} транзакции чакат одобрение`}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/accounting')}
+            className="rounded-xl px-4 py-2 text-sm font-semibold text-white shrink-0 bg-amber-500 hover:bg-amber-600"
+          >
+            {language === 'ru' ? 'Перейти →' : language === 'en' ? 'Review →' : language === 'uk' ? 'Переглянути →' : 'Прегледай →'}
+          </button>
+        </div>
+      )}
 
       {/* Audit banners */}
       {entryPath === 'existing' && !auditCompleted && unresolvedCritical.length > 0 && (

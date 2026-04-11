@@ -45,6 +45,9 @@ export interface Transaction {
   subscriptionPeriodEnd?: string    // 'YYYY-MM-DD'
   isDeferred?: boolean              // приход за бъдещ период
   companyId?: string
+  // Approval workflow (only active when company has separate accountant)
+  status?: 'approved' | 'pending_approval' | 'rejected'
+  rejectionNote?: string
 }
 
 interface AccountingState {
@@ -52,11 +55,14 @@ interface AccountingState {
   isSynced: boolean
 
   initFromSupabase: (companyId: string) => Promise<void>
-  addTransaction:    (tx: Omit<Transaction, 'id'>) => void
+  addTransaction:    (tx: Omit<Transaction, 'id'>, needsApproval?: boolean) => void
   updateTransaction: (id: string, patch: Partial<Transaction>) => void
   deleteTransaction: (id: string) => void
+  approveTransaction: (id: string, approverProfileId: string) => void
+  rejectTransaction:  (id: string, note: string, rejectorProfileId: string) => void
+  getPendingTransactions: () => Transaction[]
   backfillJournalEntries: () => void
-  // Агрегатори
+  // Агрегатори (only count status='approved' or legacy undefined status)
   getByPeriod: (from: string, to: string, companyId?: string) => Transaction[]
   getTotalIncome: (from: string, to: string) => number
   getTotalExpenses: (from: string, to: string) => number
@@ -133,35 +139,37 @@ export const useAccountingStore = create<AccountingState>()(
         }
       },
 
-      addTransaction: (tx) => {
+      addTransaction: (tx, needsApproval = false) => {
         const id = crypto.randomUUID()
-        const newTx: Transaction = { ...tx, id }
-
-        // Auto-create journal entries — atomic with transaction creation
-        const journalState = useJournalStore.getState()
-        const alreadyLinked = journalState.entries.some(
-          (e) => e.linkedTransactionId === id
-        )
+        const status = needsApproval ? 'pending_approval' : 'approved'
+        const newTx: Transaction = { ...tx, id, status }
 
         let entry: JournalEntry | null = null
         let vatEntry: JournalEntry | null = null
         let vatInputEntry: JournalEntry | null = null
 
-        if (!alreadyLinked) {
-          const rawEntry         = transactionToJournalEntry(newTx)
-          const rawVatEntry      = createVatJournalEntry(newTx)
-          const rawVatInputEntry = createVatInputCreditEntry(newTx)
-          entry         = rawEntry         ? { ...rawEntry,         id: crypto.randomUUID() } : null
-          vatEntry      = rawVatEntry      ? { ...rawVatEntry,      id: crypto.randomUUID() } : null
-          vatInputEntry = rawVatInputEntry ? { ...rawVatInputEntry, id: crypto.randomUUID() } : null
-          useJournalStore.setState({
-            entries: [
-              ...journalState.entries,
-              ...(entry         ? [entry]         : []),
-              ...(vatEntry      ? [vatEntry]      : []),
-              ...(vatInputEntry ? [vatInputEntry] : []),
-            ],
-          })
+        // Auto-create journal entries ONLY for approved transactions
+        if (status === 'approved') {
+          const journalState = useJournalStore.getState()
+          const alreadyLinked = journalState.entries.some(
+            (e) => e.linkedTransactionId === id
+          )
+          if (!alreadyLinked) {
+            const rawEntry         = transactionToJournalEntry(newTx)
+            const rawVatEntry      = createVatJournalEntry(newTx)
+            const rawVatInputEntry = createVatInputCreditEntry(newTx)
+            entry         = rawEntry         ? { ...rawEntry,         id: crypto.randomUUID() } : null
+            vatEntry      = rawVatEntry      ? { ...rawVatEntry,      id: crypto.randomUUID() } : null
+            vatInputEntry = rawVatInputEntry ? { ...rawVatInputEntry, id: crypto.randomUUID() } : null
+            useJournalStore.setState({
+              entries: [
+                ...journalState.entries,
+                ...(entry         ? [entry]         : []),
+                ...(vatEntry      ? [vatEntry]      : []),
+                ...(vatInputEntry ? [vatInputEntry] : []),
+              ],
+            })
+          }
         }
 
         // Optimistic local update
@@ -177,6 +185,87 @@ export const useAccountingStore = create<AccountingState>()(
           })
         }
       },
+
+      approveTransaction: (id, approverProfileId) => {
+        set((s) => ({
+          transactions: s.transactions.map((t) =>
+            t.id === id ? { ...t, status: 'approved' as const, rejectionNote: undefined } : t
+          ),
+        }))
+
+        // Create journal entries for the newly approved transaction
+        const tx = get().transactions.find((t) => t.id === id)
+        if (tx) {
+          const journalState = useJournalStore.getState()
+          const alreadyLinked = journalState.entries.some((e) => e.linkedTransactionId === id)
+          if (!alreadyLinked) {
+            const rawEntry         = transactionToJournalEntry(tx)
+            const rawVatEntry      = createVatJournalEntry(tx)
+            const rawVatInputEntry = createVatInputCreditEntry(tx)
+            const newEntries = [
+              ...(rawEntry         ? [{ ...rawEntry,         id: crypto.randomUUID() }] : []),
+              ...(rawVatEntry      ? [{ ...rawVatEntry,      id: crypto.randomUUID() }] : []),
+              ...(rawVatInputEntry ? [{ ...rawVatInputEntry, id: crypto.randomUUID() }] : []),
+            ]
+            if (newEntries.length > 0) {
+              useJournalStore.setState({ entries: [...journalState.entries, ...newEntries] })
+            }
+          }
+        }
+
+        // Sync status to Supabase
+        if (get().isSynced) {
+          import('../lib/supabaseAccounting').then(({ updateTransactionInSupabase }) => {
+            updateTransactionInSupabase(id, { status: 'approved' }).then(({ error }) => {
+              if (error) console.error('Sync approveTransaction error:', error)
+            })
+          })
+          // Record in transaction_approvals
+          import('../lib/supabase').then(({ supabase: sb }) => {
+            if (!sb) return
+            sb.from('transaction_approvals').insert({
+              transaction_id:   id,
+              action:           'approved',
+              by_profile_id:    approverProfileId,
+              created_at:       new Date().toISOString(),
+            }).then(({ error }) => {
+              if (error) console.error('Sync approval record error:', error)
+            })
+          })
+        }
+      },
+
+      rejectTransaction: (id, note, rejectorProfileId) => {
+        set((s) => ({
+          transactions: s.transactions.map((t) =>
+            t.id === id ? { ...t, status: 'rejected' as const, rejectionNote: note } : t
+          ),
+        }))
+
+        if (get().isSynced) {
+          import('../lib/supabaseAccounting').then(({ updateTransactionInSupabase }) => {
+            updateTransactionInSupabase(id, { status: 'rejected', rejectionNote: note }).then(({ error }) => {
+              if (error) console.error('Sync rejectTransaction error:', error)
+            })
+          })
+          import('../lib/supabase').then(({ supabase: sb }) => {
+            if (!sb) return
+            sb.from('transaction_approvals').insert({
+              transaction_id:   id,
+              action:           'rejected',
+              by_profile_id:    rejectorProfileId,
+              note,
+              created_at:       new Date().toISOString(),
+            }).then(({ error }) => {
+              if (error) console.error('Sync rejection record error:', error)
+            })
+          })
+        }
+      },
+
+      getPendingTransactions: () =>
+        get().transactions.filter((t) => t.status === 'pending_approval'),
+
 
       updateTransaction: (id, patch) => {
         // Update local state first
@@ -272,8 +361,11 @@ export const useAccountingStore = create<AccountingState>()(
 
       getByPeriod: (from, to, companyId?: string) =>
         get().transactions.filter(
-          (t) => t.date >= from && t.date <= to && !t.isDeferred &&
-          (companyId ? t.companyId === companyId : true)
+          (t) =>
+            t.date >= from && t.date <= to && !t.isDeferred &&
+            (companyId ? t.companyId === companyId : true) &&
+            // Only approved (or legacy undefined) transactions count in calculations
+            (t.status === undefined || t.status === 'approved')
         ),
 
       getTotalIncome: (from, to) =>

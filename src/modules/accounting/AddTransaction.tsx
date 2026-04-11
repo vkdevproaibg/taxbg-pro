@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { useAccountingStore } from '../../store/accountingStore'
 import type { TransactionType } from '../../store/accountingStore'
+import { useCompanyRole } from '../../hooks/useCompanyRole'
 import HelpButton from '../../components/ui/HelpButton'
 import { useT } from '../../lib/useT'
+import { useUserStore } from '../../store/userStore'
 import { usePaywall } from '../../hooks/usePaywall'
 import PaywallModal from '../../components/ui/PaywallModal'
 
@@ -38,6 +40,8 @@ const VAT_RATES: { value: 0.20 | 0.09 | 0; label: string }[] = [
 export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionProps = {}) {
   const t = useT()
   const add = useAccountingStore((s) => s.addTransaction)
+  const { needsApproval } = useCompanyRole()
+  const language = useUserStore((s) => s.language)
   const { checkAccess } = usePaywall()
   const [paywallReason, setPaywallReason] = useState<'add_transaction' | null>(null)
 
@@ -68,19 +72,22 @@ export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionPr
     }
     if (!description.trim() || !amount) return
     const amt = Number(amount)
-    add({
-      date,
-      description: description.trim(),
-      amount: amt,
-      type,
-      vatRate:       showVat ? vatRate : undefined,
-      vatAmount:     showVat ? Number((amt * vatRate).toFixed(2)) : undefined,
-      counterparty:  counterparty.trim()  || undefined,
-      invoiceNumber: invoiceNo.trim()     || undefined,
-      assetName:         assetName.trim()      || undefined,
+    add(
+      {
+        date,
+        description: description.trim(),
+        amount: amt,
+        type,
+        vatRate:       showVat ? vatRate : undefined,
+        vatAmount:     showVat ? Number((amt * vatRate).toFixed(2)) : undefined,
+        counterparty:  counterparty.trim()  || undefined,
+        invoiceNumber: invoiceNo.trim()     || undefined,
+        assetName:         assetName.trim()      || undefined,
       municipality:      municipality.trim()   || undefined,
       deductiblePercent: showDeductible ? deductiblePct : undefined,
-    })
+      },
+      needsApproval
+    )
 
     if (onAdd) {
       const txs = useAccountingStore.getState().transactions
@@ -95,6 +102,17 @@ export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionPr
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
       <h3 className="mb-4 font-medium text-slate-700">Ръчно добавяне</h3>
+
+      {needsApproval && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {({
+            ru: 'Транзакция будет отправлена на утверждение бухгалтеру',
+            en: 'Transaction will be sent for accountant approval',
+            bg: 'Транзакцията ще бъде изпратена за одобрение от счетоводителя',
+            uk: 'Транзакція буде відправлена на затвердження бухгалтеру',
+          } as Record<string, string>)[language] ?? 'Транзакцията ще бъде изпратена за одобрение'}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
 
         <div>
@@ -201,7 +219,9 @@ export default function AddTransaction({ defaultTypes, onAdd }: AddTransactionPr
       <button onClick={handleAdd}
         disabled={!description.trim() || !amount}
         className="mt-4 rounded-lg bg-violet-600 px-6 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-40">
-        {t('btn_add')}
+        {needsApproval
+          ? ({ ru: 'Подать на утверждение', en: 'Submit for approval', bg: 'Подай за одобрение', uk: 'Подати на затвердження' } as Record<string, string>)[language] ?? 'Подай за одобрение'
+          : t('btn_add')}
       </button>
 
       {paywallReason && (

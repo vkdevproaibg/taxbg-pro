@@ -32,6 +32,7 @@ import AuditHelp from './pages/AuditHelp'
 import { useUserStore } from './store/userStore'
 import { useAccountingStore } from './store/accountingStore'
 import { useCompaniesStore } from './store/companiesStore'
+import { useNotificationsStore } from './store/notificationsStore'
 import { ensureCapitalEntry } from './lib/journalAI'
 
 function App() {
@@ -39,6 +40,8 @@ function App() {
   const onboardingDone = useUserStore((s) => s.onboardingDone)
   const companies      = useCompaniesStore((s) => s.companies)
   const isSynced       = useCompaniesStore((s) => s.isSynced)
+  const activeCompanyId = useCompaniesStore((s) => s.activeCompanyId)
+  const transactionsCount = useAccountingStore((s) => s.transactions.length)
 
   useEffect(() => {
     initialize()
@@ -47,6 +50,20 @@ function App() {
     if (useCompaniesStore.getState().companies.length > 0) {
       ensureCapitalEntry()
     }
+  }, [])
+
+  // Refresh notifications whenever relevant state settles (auth, active company, transactions)
+  useEffect(() => {
+    if (isLoading) return
+    useNotificationsStore.getState().refreshNotifications()
+  }, [isLoading, isDemo, activeCompanyId, transactionsCount])
+
+  // Periodic refresh every 6 hours for long-lived tabs
+  useEffect(() => {
+    const interval = setInterval(() => {
+      useNotificationsStore.getState().refreshNotifications()
+    }, 6 * 60 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [])
 
   // Handle Stripe return after successful payment
