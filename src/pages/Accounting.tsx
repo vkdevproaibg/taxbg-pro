@@ -41,6 +41,7 @@ export default function Accounting() {
   const t = useT()
   const readiness = useDataReadiness()
   const dataReady = useCompanyDataReady()
+  const isOwnerMode = useUserStore((s) => s.viewMode) === 'owner'
   const [tab, setTab] = useState<AccountingTab>('income')
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function Accounting() {
     return () => window.removeEventListener('tour:activate-tab', handler)
   }, [])
 
-  const TABS: { id: AccountingTab; label: string }[] = [
+  const ALL_TABS: { id: AccountingTab; label: string }[] = [
     { id: 'income',    label: t('tab_income')      },
     { id: 'expense',   label: t('tab_expense')     },
     { id: 'ledger',    label: t('tab_ledger')      },
@@ -64,6 +65,18 @@ export default function Accounting() {
     { id: 'reports',   label: t('tab_reports_nap') },
     { id: 'documents', label: t('tab_documents')   },
   ]
+  const OWNER_VISIBLE_TABS: AccountingTab[] = ['income', 'expense', 'documents']
+  const TABS = isOwnerMode
+    ? ALL_TABS.filter((x) => OWNER_VISIBLE_TABS.includes(x.id))
+    : ALL_TABS
+
+  // Snap back to an allowed tab if user switches to owner mode while on a hidden tab
+  useEffect(() => {
+    if (isOwnerMode && !OWNER_VISIBLE_TABS.includes(tab)) {
+      setTab('income')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOwnerMode])
 
   if (!dataReady) {
     return (

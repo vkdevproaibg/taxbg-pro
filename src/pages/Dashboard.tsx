@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useCompanyDataReady } from '../hooks/useCompanyData'
 import { useCompanyRole } from '../hooks/useCompanyRole'
 import { useUserStore } from '../store/userStore'
+import OwnerDashboard from './OwnerDashboard'
 import { useEntryAuditStore } from '../store/entryAuditStore'
 import { useAccountingStore } from '../store/accountingStore'
 import { useEmployeesStore } from '../store/employeesStore'
@@ -25,6 +26,14 @@ function formatPercent(value: number): string {
 }
 
 export default function Dashboard() {
+  const viewMode = useUserStore((s) => s.viewMode)
+  if (viewMode === 'owner') {
+    return <OwnerDashboard />
+  }
+  return <AccountantDashboard />
+}
+
+function AccountantDashboard() {
   const { legalForm, companyName, taxPeriod, hasVat, hasEmployees, eik, language } = useUserStore()
   const t = useT()
   const readiness = useDataReadiness()

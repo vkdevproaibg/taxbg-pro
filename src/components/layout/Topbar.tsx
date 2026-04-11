@@ -1,7 +1,42 @@
 import { useNavigate } from 'react-router-dom'
+import { Eye, Calculator as CalcIcon } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useUserStore } from '../../store/userStore'
 import NotificationBell from '../ui/NotificationBell'
+
+const VIEW_MODE_LABELS = {
+  owner: {
+    ru: 'Собственник', en: 'Owner', bg: 'Собственик', uk: 'Власник',
+  },
+  accountant: {
+    ru: 'Бухгалтер', en: 'Accountant', bg: 'Счетоводител', uk: 'Бухгалтер',
+  },
+} as const
+
+function ViewModeIndicator() {
+  const viewMode = useUserStore((s) => s.viewMode)
+  const setViewMode = useUserStore((s) => s.setViewMode)
+  const language = useUserStore((s) => s.language)
+  const isOwner = viewMode === 'owner'
+  const label = VIEW_MODE_LABELS[viewMode][language] ?? VIEW_MODE_LABELS[viewMode].ru
+  const Icon = isOwner ? Eye : CalcIcon
+
+  return (
+    <button
+      onClick={() => setViewMode(isOwner ? 'accountant' : 'owner')}
+      className="flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-[--surface]"
+      style={{
+        borderColor: 'var(--border)',
+        color: isOwner ? 'var(--accent-text)' : 'var(--text-secondary)',
+        backgroundColor: isOwner ? 'var(--accent-light)' : 'var(--surface)',
+      }}
+      title={label}
+    >
+      <Icon size={14} />
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  )
+}
 
 function UserMenu() {
   const { user, profile, isDemo, signOut } = useAuthStore()
@@ -74,8 +109,9 @@ export default function Topbar() {
           )}
         </div>
 
-        {/* Right side: notifications + user menu */}
+        {/* Right side: view mode + notifications + user menu */}
         <div className="flex items-center gap-2">
+          <ViewModeIndicator />
           <NotificationBell />
           <UserMenu />
         </div>

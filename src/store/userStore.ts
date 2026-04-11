@@ -5,6 +5,7 @@ export type LegalForm = 'ood' | 'et' | 'self'
 export type AppLanguage = 'ru' | 'uk' | 'en' | 'bg'
 export type LLMProvider = 'openrouter' | 'original'
 export type LLMMode = 'own_key' | 'platform'
+export type ViewMode = 'owner' | 'accountant'
 
 interface UserState {
   onboardingDone: boolean
@@ -15,6 +16,7 @@ interface UserState {
   language: AppLanguage
   companyName: string
   taxPeriod: string
+  viewMode: ViewMode
   llmProvider: LLMProvider
   llmMode: LLMMode
   llmApiKey: string
@@ -28,6 +30,7 @@ interface UserState {
   setLanguage: (lang: AppLanguage) => void
   setCompanyName: (name: string) => void
   setTaxPeriod: (period: string) => void
+  setViewMode: (mode: ViewMode) => void
   setLlmProvider: (provider: LLMProvider) => void
   setLlmApiKey: (key: string) => void
   setLlmModel: (model: string) => void
@@ -45,6 +48,7 @@ export const useUserStore = create<UserState>()(
       language: 'ru',
       companyName: '',
       taxPeriod: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+      viewMode: 'owner',
       llmProvider: 'openrouter',
       llmMode: 'own_key',
       llmApiKey: '',
@@ -58,6 +62,7 @@ export const useUserStore = create<UserState>()(
       setLanguage: (language) => set({ language }),
       setCompanyName: (companyName) => set({ companyName }),
       setTaxPeriod: (taxPeriod) => set({ taxPeriod }),
+      setViewMode: (viewMode) => set({ viewMode }),
       setLlmProvider: (llmProvider) => set({ llmProvider }),
       setLlmApiKey: (llmApiKey) => set({ llmApiKey }),
       setLlmModel: (llmModel) => set({ llmModel }),

@@ -518,6 +518,8 @@ export default function Settings() {
                 </div>
               </div>
 
+              <ViewModeSection />
+
               <button className="rounded-xl px-6 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: 'var(--accent)' }} onClick={handleSave}>
                 {saved ? t('btn_saved') : t('btn_save')}
               </button>
@@ -957,6 +959,80 @@ export default function Settings() {
             </div>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+const VIEW_MODE_TEXTS = {
+  ru: {
+    title: 'Режим отображения',
+    owner: 'Собственник',
+    ownerDesc: 'Управленческий обзор: ключевые метрики, состояние отчётности, контроль работы бухгалтера. Скрывает технические разделы.',
+    accountant: 'Бухгалтер',
+    accountantDesc: 'Полный доступ: журнал, ОПР, баланс, НАП отчёты, все модули приложения.',
+  },
+  uk: {
+    title: 'Режим відображення',
+    owner: 'Власник',
+    ownerDesc: 'Управлінський огляд: ключові метрики, стан звітності, контроль роботи бухгалтера. Приховує технічні розділи.',
+    accountant: 'Бухгалтер',
+    accountantDesc: 'Повний доступ: журнал, ОПР, баланс, звіти НАП, усі модулі застосунку.',
+  },
+  en: {
+    title: 'Display mode',
+    owner: 'Owner',
+    ownerDesc: 'Management view: key metrics, reporting status, accountant oversight. Hides technical sections.',
+    accountant: 'Accountant',
+    accountantDesc: 'Full access: ledger, P&L, balance sheet, NAP reports, all app modules.',
+  },
+  bg: {
+    title: 'Режим на преглед',
+    owner: 'Собственик',
+    ownerDesc: 'Управленски преглед: ключови метрики, статус на отчетността, контрол на счетоводителя. Скрива техническите раздели.',
+    accountant: 'Счетоводител',
+    accountantDesc: 'Пълен достъп: дневник, ОПР, баланс, отчети НАП, всички модули на приложението.',
+  },
+} as const
+
+function ViewModeSection() {
+  const viewMode = useUserStore((s) => s.viewMode)
+  const setViewMode = useUserStore((s) => s.setViewMode)
+  const language = useUserStore((s) => s.language)
+  const texts = VIEW_MODE_TEXTS[language] ?? VIEW_MODE_TEXTS.ru
+
+  const options: { value: 'owner' | 'accountant'; label: string; desc: string }[] = [
+    { value: 'owner',      label: texts.owner,      desc: texts.ownerDesc      },
+    { value: 'accountant', label: texts.accountant, desc: texts.accountantDesc },
+  ]
+
+  return (
+    <div style={cardStyle}>
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        {texts.title}
+      </h2>
+      <div className="space-y-2">
+        {options.map((opt) => {
+          const active = viewMode === opt.value
+          return (
+            <button
+              key={opt.value}
+              onClick={() => setViewMode(opt.value)}
+              className="w-full rounded-xl px-4 py-3 text-left transition-colors"
+              style={{
+                border: active ? '2px solid var(--accent)' : '2px solid var(--border)',
+                backgroundColor: active ? 'var(--accent-light)' : 'var(--surface)',
+              }}
+            >
+              <div className="text-sm font-medium" style={{ color: active ? 'var(--accent-text)' : 'var(--text-primary)' }}>
+                {opt.label}
+              </div>
+              <div className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                {opt.desc}
+              </div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
