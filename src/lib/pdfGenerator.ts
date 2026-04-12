@@ -1,5 +1,6 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, rgb } from 'pdf-lib'
 import type { DDSFormData, ZKPOFormData } from '../modules/reports/types'
+import { embedCyrillicFonts } from './pdfFonts'
 
 function dl(bytes: Uint8Array, name: string) {
   const url = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type: 'application/pdf' }))
@@ -11,8 +12,7 @@ function dl(bytes: Uint8Array, name: string) {
 async function base() {
   const doc  = await PDFDocument.create()
   const page = doc.addPage([595, 842])
-  const font = await doc.embedFont(StandardFonts.Helvetica)
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const { font, bold } = await embedCyrillicFonts(doc)
   return { doc, page, font, bold }
 }
 

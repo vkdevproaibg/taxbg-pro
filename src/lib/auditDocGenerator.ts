@@ -1,7 +1,10 @@
+import { PDFDocument, rgb } from 'pdf-lib'
+import type { PDFFont, PDFPage } from 'pdf-lib'
 import type { Transaction } from '../store/accountingStore'
 import type { Employee } from '../store/employeesStore'
 import type { JournalEntry } from '../store/journalStore'
 import { AUDIT_TEMPLATES, type AuditLang, type AuditTemplate } from '../constants/audit-templates'
+import { embedCyrillicFonts, wrapText } from './pdfFonts'
 import { getRateValue } from './taxRates'
 import { buildOPR } from './financialReports'
 import { calculateObrazec1 } from './obrazec1'
@@ -286,4 +289,79 @@ export function getApplicableTemplates(context: {
     }
     return true
   })
+}
+
+// ── PDF export for explanatory notes ───────────────────────
+
+const A4_W = 595
+const A4_H = 842
+const MARGIN = 40
+const CONTENT_W = A4_W - MARGIN * 2 // 515
+const LINE_H = 18
+
+const LANG_LABELS: Record<AuditLang, string> = {
+  ru: 'ПЕРЕВОД (русский)',
+  en: 'TRANSLATION (English)',
+  bg: '',
+  uk: 'ПЕРЕКЛАД (українська)',
+}
+
+function drawWrappedText(
+  doc: PDFDocument,
+  startPage: PDFPage,
+  lines: string[],
+  font: PDFFont,
+  fontSize: number,
+  startY: number,
+  color = rgb(0.1, 0.1, 0.1),
+): PDFPage {
+  let page = startPage
+  let y = startY
+
+  for (const line of lines) {
+    if (y < MARGIN) {
+      page = doc.addPage([A4_W, A4_H])
+      y = A4_H - MARGIN
+    }
+    if (line !== '') {
+      page.drawText(line, { x: MARGIN, y, font, size: fontSize, color })
+    }
+    y -= LINE_H
+  }
+
+  return page
+}
+
+export async function generateExplanatoryNotePdf(
+  templateId: string,
+  context: AuditDocContext,
+  userLanguage: AuditLang,
+): Promise<Uint8Array> {
+  const note = generateExplanatoryNote(templateId, context, userLanguage)
+  if (!note) throw new Error(`Template ${templateId} not found`)
+
+  const doc = await PDFDocument.create()
+  const { font, bold } = await embedCyrillicFonts(doc)
+
+  // Page 1+: Bulgarian text (for the inspector)
+  const page1 = doc.addPage([A4_W, A4_H])
+  page1.drawText('ОБЯСНИТЕЛНА ЗАПИСКА', {
+    x: MARGIN, y: A4_H - MARGIN, font: bold, size: 14, color: rgb(0.1, 0.1, 0.1),
+  })
+
+  const bgLines = wrapText(note.bg, font, 12, CONTENT_W)
+  drawWrappedText(doc, page1, bgLines, font, 12, A4_H - MARGIN - 30)
+
+  // Translation page(s) — only if user language is not Bulgarian
+  if (userLanguage !== 'bg') {
+    const transPage = doc.addPage([A4_W, A4_H])
+    transPage.drawText(LANG_LABELS[userLanguage], {
+      x: MARGIN, y: A4_H - MARGIN, font: bold, size: 14, color: rgb(0.1, 0.1, 0.1),
+    })
+
+    const transLines = wrapText(note.userLang, font, 12, CONTENT_W)
+    drawWrappedText(doc, transPage, transLines, font, 12, A4_H - MARGIN - 30)
+  }
+
+  return doc.save()
 }

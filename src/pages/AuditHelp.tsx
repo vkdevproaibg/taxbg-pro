@@ -6,9 +6,12 @@ import { useEmployeesStore } from '../store/employeesStore'
 import { useJournalStore } from '../store/journalStore'
 import {
   generateExplanatoryNote,
+  generateExplanatoryNotePdf,
   getApplicableTemplates,
   type GeneratedNote,
 } from '../lib/auditDocGenerator'
+import { useExportWithWarning } from '../hooks/useExportWithWarning'
+import ExportWarningModal from '../components/ui/ExportWarningModal'
 import { generateAuditAnswer } from '../lib/auditLLM'
 import type { AuditTemplate, AuditLang } from '../constants/audit-templates'
 
@@ -48,6 +51,7 @@ const T = {
     llmWarning:
       'Этот ответ сгенерирован ИИ на основе данных системы. Проверьте перед использованием.',
     llmFailed: 'Не удалось подготовить ответ. Попробуйте ещё раз.',
+    downloadPdf: 'Скачать PDF',
   },
   en: {
     pageTitle: 'Tax Audit Help (NRA / NOI)',
@@ -83,6 +87,7 @@ const T = {
     llmWarning:
       'This answer was AI-generated from your system data. Please review before use.',
     llmFailed: 'Failed to prepare an answer. Please try again.',
+    downloadPdf: 'Download PDF',
   },
   bg: {
     pageTitle: 'Помощ при ревизия (НАП / НОИ)',
@@ -118,6 +123,7 @@ const T = {
     llmWarning:
       'Този отговор е генериран от ИИ на база данни от системата. Проверете го преди употреба.',
     llmFailed: 'Неуспешно подготвяне на отговор. Опитайте отново.',
+    downloadPdf: 'Изтегли PDF',
   },
   uk: {
     pageTitle: 'Допомога при перевірці НАП / НОІ',
@@ -153,6 +159,7 @@ const T = {
     llmWarning:
       'Цю відповідь згенеровано ШІ на основі даних системи. Перевірте перед використанням.',
     llmFailed: 'Не вдалося підготувати відповідь. Спробуйте ще раз.',
+    downloadPdf: 'Завантажити PDF',
   },
 }
 
@@ -194,6 +201,40 @@ export default function AuditHelp() {
   )
 
   const ownerName = profile?.full_name ?? ''
+
+  const { exportWithWarning, confirm: confirmExport, closeModal: closeExportModal, pending: pendingExport, isOpen: isExportModalOpen } = useExportWithWarning()
+
+  const handleDownloadPdf = (templateId: string) => {
+    exportWithWarning({
+      documentName: `explanatory_note_${templateId}.pdf`,
+      retentionClass: 'accounting_10y',
+      legalBasis: 'Закон за счетоводството, чл. 12',
+      onConfirm: async () => {
+        const pdfBytes = await generateExplanatoryNotePdf(
+          templateId,
+          {
+            companyName,
+            eik,
+            ownerName,
+            legalForm,
+            hasVat,
+            hasEmployees,
+            transactions,
+            employees,
+            journalEntries,
+          },
+          language,
+        )
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `explanatory_note_${templateId}.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+      },
+    })
+  }
 
   const handleGenerate = (templateId: string) => {
     const note = generateExplanatoryNote(
@@ -482,8 +523,28 @@ export default function AuditHelp() {
               copiedTag={copiedTag}
               tagPrefix="tpl"
             />
+
+            <button
+              onClick={() => handleDownloadPdf(generated.templateUsed)}
+              className="rounded-lg px-3 py-1.5 text-xs font-medium"
+              style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+            >
+              {labels.downloadPdf}
+            </button>
           </div>
         </div>
+      )}
+
+      {pendingExport && (
+        <ExportWarningModal
+          isOpen={isExportModalOpen}
+          onClose={closeExportModal}
+          onConfirm={confirmExport}
+          documentName={pendingExport.documentName}
+          retentionClass={pendingExport.retentionClass}
+          retainUntil={pendingExport.retainUntil}
+          legalBasis={pendingExport.legalBasis}
+        />
       )}
     </div>
   )

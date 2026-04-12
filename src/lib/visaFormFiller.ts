@@ -1,4 +1,5 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, rgb } from 'pdf-lib'
+import { embedCyrillicFonts, fitTextToWidth } from './pdfFonts'
 
 export interface VisaFormData {
   lastName: string
@@ -197,12 +198,12 @@ export async function fillVisaForm(form: VisaFormData): Promise<void> {
   )
   const pdfBytes = await response.arrayBuffer()
   const pdfDoc = await PDFDocument.load(pdfBytes)
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const { font } = await embedCyrillicFonts(pdfDoc)
   const pages = pdfDoc.getPages()
   const INK = rgb(0, 0, 0.55) // dark blue — typed text appearance
   const SZ = 8.5
 
-  // Draw text at field position, truncating to fit maxWidth
+  // Draw text at field position, auto-shrinking font to fit maxWidth
   const put = (key: string, value: string) => {
     if (!value?.trim()) return
     const c = FIELDS[key]
@@ -210,12 +211,8 @@ export async function fillVisaForm(form: VisaFormData): Promise<void> {
     const [x, y, maxW, pg] = c
     const page = pages[pg]
     if (!page) return
-    let text = value.trim()
-    while (text.length > 1 &&
-           font.widthOfTextAtSize(text, SZ) > maxW) {
-      text = text.slice(0, -1)
-    }
-    page.drawText(text, { x, y, size: SZ, font, color: INK })
+    const fitted = fitTextToWidth(value.trim(), font, SZ, maxW)
+    page.drawText(fitted.text, { x, y, size: fitted.fontSize, font, color: INK })
   }
 
   // Mark checkbox with X
