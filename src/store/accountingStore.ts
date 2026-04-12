@@ -144,6 +144,10 @@ export const useAccountingStore = create<AccountingState>()(
         const status = needsApproval ? 'pending_approval' : 'approved'
         const newTx: Transaction = { ...tx, id, status }
 
+        import('../lib/analytics').then(({ trackEvent }) => {
+          trackEvent('transaction_added', { type: tx.type })
+        })
+
         let entry: JournalEntry | null = null
         let vatEntry: JournalEntry | null = null
         let vatInputEntry: JournalEntry | null = null

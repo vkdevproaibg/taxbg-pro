@@ -4,12 +4,13 @@ import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import { useUserStore } from '../../store/userStore'
 import type { AppLanguage } from '../../store/userStore'
+import { initAnalytics, setAnalyticsEnabled } from '../../lib/analytics'
 
 const STORAGE_KEY = 'taxbg-cookie-consent'
 
 type CookieConsent = {
   necessary: true
-  analytics: false
+  analytics: boolean
   acceptedAt: string
   version: number
 }
@@ -40,7 +41,7 @@ const UI: Record<AppLanguage, {
     necessaryDesc: 'Нужны для работы входа, безопасности и сохранения настроек.',
     alwaysOn: 'Всегда включены',
     analytics: 'Аналитические',
-    analyticsDesc: 'Не используются в данный момент.',
+    analyticsDesc: 'Анонимная статистика использования. Данные не передаются третьим сторонам.',
     analyticsDisabled: 'Не используется',
     saveAndClose: 'Сохранить',
   },
@@ -55,7 +56,7 @@ const UI: Record<AppLanguage, {
     necessaryDesc: 'Потрібні для входу, безпеки та збереження налаштувань.',
     alwaysOn: 'Завжди увімкнені',
     analytics: 'Аналітичні',
-    analyticsDesc: 'Наразі не використовуються.',
+    analyticsDesc: 'Анонімна статистика використання. Дані не передаються третім сторонам.',
     analyticsDisabled: 'Не використовується',
     saveAndClose: 'Зберегти',
   },
@@ -70,7 +71,7 @@ const UI: Record<AppLanguage, {
     necessaryDesc: 'Required for login, security and preference storage.',
     alwaysOn: 'Always on',
     analytics: 'Analytics',
-    analyticsDesc: 'Not used at this time.',
+    analyticsDesc: 'Anonymous usage statistics. Data is not shared with third parties.',
     analyticsDisabled: 'Not in use',
     saveAndClose: 'Save',
   },
@@ -85,7 +86,7 @@ const UI: Record<AppLanguage, {
     necessaryDesc: 'Нужни за вход, сигурност и съхранение на настройки.',
     alwaysOn: 'Винаги включени',
     analytics: 'Аналитични',
-    analyticsDesc: 'Не се използват в момента.',
+    analyticsDesc: 'Анонимна статистика за ползването. Данните не се споделят с трети страни.',
     analyticsDisabled: 'Не се използва',
     saveAndClose: 'Запази',
   },
@@ -113,6 +114,7 @@ export default function CookieBanner() {
 
   const [visible, setVisible] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [analyticsChecked, setAnalyticsChecked] = useState(false)
 
   useEffect(() => {
     try {
@@ -128,14 +130,22 @@ export default function CookieBanner() {
   const accept = async () => {
     const consent: CookieConsent = {
       necessary: true,
-      analytics: false,
+      analytics: analyticsChecked,
       acceptedAt: new Date().toISOString(),
       version: 1,
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(consent))
+      localStorage.setItem('taxbg-cookie-analytics', analyticsChecked ? 'true' : 'false')
     } catch (e) {
       console.warn('[cookie-banner] localStorage write failed', e)
+    }
+    // Start or stop analytics immediately
+    if (analyticsChecked) {
+      setAnalyticsEnabled(true)
+      initAnalytics()
+    } else {
+      setAnalyticsEnabled(false)
     }
     setVisible(false)
     void writeAuditConsent(consent)
@@ -190,19 +200,16 @@ export default function CookieBanner() {
               </span>
             </label>
 
-            <label className="mt-2 flex items-start gap-3 rounded-md bg-slate-50 p-3 opacity-60">
+            <label className="mt-2 flex items-start gap-3 rounded-md bg-slate-50 p-3 cursor-pointer">
               <input
                 type="checkbox"
-                disabled
-                title={ui.analyticsDisabled}
+                checked={analyticsChecked}
+                onChange={(e) => setAnalyticsChecked(e.target.checked)}
                 className="mt-0.5 h-4 w-4"
               />
               <span className="flex-1">
                 <span className="block text-sm font-medium text-slate-800">{ui.analytics}</span>
                 <span className="block text-xs text-slate-500">{ui.analyticsDesc}</span>
-                <span className="mt-1 inline-block text-[11px] font-semibold text-slate-500">
-                  {ui.analyticsDisabled}
-                </span>
               </span>
             </label>
 

@@ -38,6 +38,9 @@ export const useVaultUploadsStore = create<VaultUploadsState>()(
           uploadedAt: new Date().toISOString(),
         }
         set((state) => ({ uploads: [...state.uploads, full] }))
+        import('../lib/analytics').then(({ trackEvent }) => {
+          trackEvent('vault_upload')
+        })
         return full
       },
 

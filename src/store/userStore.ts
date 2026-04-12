@@ -62,7 +62,12 @@ export const useUserStore = create<UserState>()(
       setLanguage: (language) => set({ language }),
       setCompanyName: (companyName) => set({ companyName }),
       setTaxPeriod: (taxPeriod) => set({ taxPeriod }),
-      setViewMode: (viewMode) => set({ viewMode }),
+      setViewMode: (viewMode) => {
+        set({ viewMode })
+        import('../lib/analytics').then(({ trackEvent }) => {
+          trackEvent('view_mode_changed', { mode: viewMode })
+        })
+      },
       setLlmProvider: (llmProvider) => set({ llmProvider }),
       setLlmApiKey: (llmApiKey) => set({ llmApiKey }),
       setLlmModel: (llmModel) => set({ llmModel }),

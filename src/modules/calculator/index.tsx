@@ -3,6 +3,7 @@ import { useUserStore } from '../../store/userStore'
 import { useCalculator } from './useCalculator'
 import type { LegalFormCalc, ExpenseMode } from './useCalculator'
 import DividendCalculator from './DividendCalculator'
+import { trackEvent } from '../../lib/analytics'
 
 const T = {
   ru: {
@@ -44,6 +45,11 @@ export default function CalculatorModule() {
 
   const result = useCalculator({ revenue, expenses, legalForm, hasBornBefore1960: bornBefore1960, expenseMode })
 
+  const handleLegalFormChange = (form: LegalFormCalc) => {
+    setLegalForm(form)
+    trackEvent('calculator_used', { legalForm: form })
+  }
+
   return (
     <div className="space-y-5 p-6">
       <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
@@ -78,7 +84,7 @@ export default function CalculatorModule() {
             <label className="mb-1 block text-xs text-slate-400">Правна форма</label>
             <select
               value={legalForm}
-              onChange={e => setLegalForm(e.target.value as LegalFormCalc)}
+              onChange={e => handleLegalFormChange(e.target.value as LegalFormCalc)}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none"
             >
               <option value="ood">ООД — корпоративен данък 10%</option>

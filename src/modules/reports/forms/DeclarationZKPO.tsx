@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import type { ZKPOFormData } from '../types'
 import { generateZKPOXml, downloadXml } from '../../../lib/xmlGenerator'
 import { generateZKPOPdf } from '../../../lib/pdfGenerator'
+import { trackEvent } from '../../../lib/analytics'
 import { ZKPO_SCHEMA } from '../../../constants/nap-schemas'
 import HelpButton from '../../../components/ui/HelpButton'
 import { BgTermLabel } from '../../../lib/bgTerms'
@@ -172,15 +173,21 @@ export default function DeclarationZKPO({ data }: Props) {
 
       <div className="flex flex-wrap gap-3">
         <button
-          onClick={() =>
+          onClick={() => {
             downloadXml(generateZKPOXml({ ...form, taxableProfit, corporateTax, taxDue, overpaid }), `ZKPO_${form.year}.xml`)
-          }
+            trackEvent('report_generated', { report: 'ZKPO' })
+            trackEvent('document_exported', { format: 'xml' })
+          }}
           className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-medium text-white hover:bg-violet-700"
         >
           XML за e-services.nap.bg
         </button>
         <button
-          onClick={() => generateZKPOPdf({ ...form, taxableProfit, corporateTax, taxDue, overpaid })}
+          onClick={() => {
+            generateZKPOPdf({ ...form, taxableProfit, corporateTax, taxDue, overpaid })
+            trackEvent('report_generated', { report: 'ZKPO' })
+            trackEvent('document_exported', { format: 'pdf' })
+          }}
           className="rounded-lg border border-violet-200 px-5 py-2 text-sm text-violet-600 hover:bg-violet-50"
         >
           PDF чернова

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { runMigration } from './lib/migration'
 import PracticalLearning from './pages/PracticalLearning'
 import TourOverlay from './components/tour/TourOverlay'
@@ -38,6 +38,7 @@ import { useAccountingStore } from './store/accountingStore'
 import { useCompaniesStore } from './store/companiesStore'
 import { useNotificationsStore } from './store/notificationsStore'
 import { ensureCapitalEntry } from './lib/journalAI'
+import { initAnalytics, trackPageView } from './lib/analytics'
 
 function App() {
   const { initialize, isLoading, isDemo } = useAuthStore()
@@ -47,14 +48,22 @@ function App() {
   const activeCompanyId = useCompaniesStore((s) => s.activeCompanyId)
   const transactionsCount = useAccountingStore((s) => s.transactions.length)
 
+  const location = useLocation()
+
   useEffect(() => {
     initialize()
     runMigration()
+    initAnalytics()
     useAccountingStore.getState().backfillJournalEntries()
     if (useCompaniesStore.getState().companies.length > 0) {
       ensureCapitalEntry()
     }
   }, [])
+
+  // Track page views on route changes
+  useEffect(() => {
+    trackPageView(location.pathname)
+  }, [location.pathname])
 
   // Refresh notifications whenever relevant state settles (auth, active company, transactions)
   useEffect(() => {

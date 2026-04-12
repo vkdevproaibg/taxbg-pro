@@ -13,8 +13,9 @@ import {
   type AdminUserSummary,
   type AuditEvent,
 } from '../lib/supabaseAdmin'
+import { supabase } from '../lib/supabase'
 
-type AdminTab = 'stats' | 'users' | 'logs' | 'legislation' | 'corrections'
+type AdminTab = 'stats' | 'users' | 'logs' | 'legislation' | 'corrections' | 'analytics'
 
 const T = {
   ru: {
@@ -29,6 +30,7 @@ const T = {
     tabLogs: 'Аудит лог',
     tabLegislation: 'Законодательство',
     tabCorrections: 'Корректировки',
+    tabAnalytics: 'Аналитика',
     totalUsers: 'Всего пользователей',
     proUsers: 'Pro подписок',
     freeUsers: 'Free пользователей',
@@ -43,6 +45,18 @@ const T = {
     logsRecent: 'Последние',
     logsEvents: 'событий',
     noEvents: 'Нет событий',
+    activeToday: 'Активных сегодня',
+    activeWeek: 'За неделю',
+    activeMonth: 'За месяц',
+    topPages: 'Топ-10 страниц',
+    topActions: 'Топ-5 действий (7 дней)',
+    activityChart: 'Активность по дням (30 дней)',
+    page: 'Страница',
+    views: 'Просмотров',
+    action: 'Действие',
+    count: 'Кол-во',
+    date: 'Дата',
+    events: 'События',
   },
   en: {
     accessDenied: 'Access denied',
@@ -56,6 +70,7 @@ const T = {
     tabLogs: 'Audit log',
     tabLegislation: 'Legislation',
     tabCorrections: 'Corrections',
+    tabAnalytics: 'Analytics',
     totalUsers: 'Total users',
     proUsers: 'Pro subscriptions',
     freeUsers: 'Free users',
@@ -70,6 +85,18 @@ const T = {
     logsRecent: 'Latest',
     logsEvents: 'events',
     noEvents: 'No events',
+    activeToday: 'Active today',
+    activeWeek: 'This week',
+    activeMonth: 'This month',
+    topPages: 'Top 10 pages',
+    topActions: 'Top 5 actions (7 days)',
+    activityChart: 'Activity by day (30 days)',
+    page: 'Page',
+    views: 'Views',
+    action: 'Action',
+    count: 'Count',
+    date: 'Date',
+    events: 'Events',
   },
   bg: {
     accessDenied: 'Достъпът е отказан',
@@ -83,6 +110,7 @@ const T = {
     tabLogs: 'Одит лог',
     tabLegislation: 'Законодателство',
     tabCorrections: 'Корекции',
+    tabAnalytics: 'Аналитика',
     totalUsers: 'Общо потребители',
     proUsers: 'Pro абонаменти',
     freeUsers: 'Free потребители',
@@ -97,6 +125,18 @@ const T = {
     logsRecent: 'Последни',
     logsEvents: 'събития',
     noEvents: 'Няма събития',
+    activeToday: 'Активни днес',
+    activeWeek: 'Тази седмица',
+    activeMonth: 'Този месец',
+    topPages: 'Топ 10 страници',
+    topActions: 'Топ 5 действия (7 дни)',
+    activityChart: 'Активност по дни (30 дни)',
+    page: 'Страница',
+    views: 'Прегледи',
+    action: 'Действие',
+    count: 'Брой',
+    date: 'Дата',
+    events: 'Събития',
   },
   uk: {
     accessDenied: 'Доступ заборонено',
@@ -110,6 +150,7 @@ const T = {
     tabLogs: 'Аудит лог',
     tabLegislation: 'Законодавство',
     tabCorrections: 'Коригування',
+    tabAnalytics: 'Аналітика',
     totalUsers: 'Всього користувачів',
     proUsers: 'Pro підписок',
     freeUsers: 'Free користувачів',
@@ -124,6 +165,18 @@ const T = {
     logsRecent: 'Останні',
     logsEvents: 'подій',
     noEvents: 'Немає подій',
+    activeToday: 'Активних сьогодні',
+    activeWeek: 'За тиждень',
+    activeMonth: 'За місяць',
+    topPages: 'Топ-10 сторінок',
+    topActions: 'Топ-5 дій (7 днів)',
+    activityChart: 'Активність по днях (30 днів)',
+    page: 'Сторінка',
+    views: 'Переглядів',
+    action: 'Дія',
+    count: 'Кількість',
+    date: 'Дата',
+    events: 'Події',
   },
 }
 
@@ -167,6 +220,17 @@ export default function SuperAdmin() {
   const [loading, setLoading] = useState(true)
   const [refreshedAt, setRefreshedAt] = useState<Date>(new Date())
 
+  // Analytics state
+  const [analyticsData, setAnalyticsData] = useState<{
+    activeToday: number
+    activeWeek: number
+    activeMonth: number
+    topPages: { page: string; views: number }[]
+    topActions: { action: string; count: number }[]
+    dailyActivity: { date: string; events: number }[]
+  } | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+
   const load = async () => {
     setLoading(true)
     const [s, u, l] = await Promise.all([
@@ -181,6 +245,98 @@ export default function SuperAdmin() {
     setRefreshedAt(new Date())
   }
 
+  const loadAnalytics = async () => {
+    if (!supabase) return
+    setAnalyticsLoading(true)
+    try {
+      const now = new Date()
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+      const [todayRes, weekRes, monthRes, pagesRes, actionsRes, dailyRes] = await Promise.all([
+        // Active users today (unique profile_id)
+        supabase.from('analytics_events')
+          .select('profile_id')
+          .gte('created_at', todayStart)
+          .not('profile_id', 'is', null),
+        // Active users this week
+        supabase.from('analytics_events')
+          .select('profile_id')
+          .gte('created_at', weekAgo)
+          .not('profile_id', 'is', null),
+        // Active users this month
+        supabase.from('analytics_events')
+          .select('profile_id')
+          .gte('created_at', monthAgo)
+          .not('profile_id', 'is', null),
+        // Top pages (page_view events last 30 days)
+        supabase.from('analytics_events')
+          .select('page_path')
+          .eq('event_type', 'page_view')
+          .gte('created_at', monthAgo),
+        // Top actions last 7 days
+        supabase.from('analytics_events')
+          .select('event_type')
+          .neq('event_type', 'page_view')
+          .gte('created_at', weekAgo),
+        // All events last 30 days for daily chart
+        supabase.from('analytics_events')
+          .select('created_at')
+          .gte('created_at', monthAgo),
+      ])
+
+      // Count unique profile_ids
+      const uniqueIds = (rows: { profile_id: string | null }[]) =>
+        new Set(rows.filter(r => r.profile_id).map(r => r.profile_id)).size
+
+      const activeToday = uniqueIds(todayRes.data ?? [])
+      const activeWeek = uniqueIds(weekRes.data ?? [])
+      const activeMonth = uniqueIds(monthRes.data ?? [])
+
+      // Aggregate top pages
+      const pageCounts = new Map<string, number>()
+      for (const row of pagesRes.data ?? []) {
+        const p = row.page_path ?? '/'
+        pageCounts.set(p, (pageCounts.get(p) ?? 0) + 1)
+      }
+      const topPages = [...pageCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([page, views]) => ({ page, views }))
+
+      // Aggregate top actions
+      const actionCounts = new Map<string, number>()
+      for (const row of actionsRes.data ?? []) {
+        const a = row.event_type
+        actionCounts.set(a, (actionCounts.get(a) ?? 0) + 1)
+      }
+      const topActions = [...actionCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([action, count]) => ({ action, count }))
+
+      // Aggregate daily activity
+      const dayCounts = new Map<string, number>()
+      for (const row of dailyRes.data ?? []) {
+        const d = row.created_at.slice(0, 10) // YYYY-MM-DD
+        dayCounts.set(d, (dayCounts.get(d) ?? 0) + 1)
+      }
+      // Fill all 30 days
+      const dailyActivity: { date: string; events: number }[] = []
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
+        const key = d.toISOString().slice(0, 10)
+        dailyActivity.push({ date: key, events: dayCounts.get(key) ?? 0 })
+      }
+
+      setAnalyticsData({ activeToday, activeWeek, activeMonth, topPages, topActions, dailyActivity })
+    } catch (err) {
+      console.error('[superadmin] analytics load failed', err)
+    }
+    setAnalyticsLoading(false)
+  }
+
   useEffect(() => { load() }, [])
 
   // Lazy-load legislation alerts on first mount of SuperAdmin page
@@ -193,12 +349,18 @@ export default function SuperAdmin() {
     if (activeCompanyId) loadCorrections(activeCompanyId)
   }, [activeCompanyId, loadCorrections])
 
+  // Lazy-load analytics data when tab is selected
+  useEffect(() => {
+    if (tab === 'analytics' && !analyticsData && !analyticsLoading) loadAnalytics()
+  }, [tab])
+
   const TABS: { id: AdminTab; label: string; icon: string; badge?: number }[] = [
     { id: 'stats',       label: labels.tabStats,       icon: '📊' },
     { id: 'users',       label: labels.tabUsers,       icon: '👥' },
     { id: 'logs',        label: labels.tabLogs,        icon: '📋' },
     { id: 'legislation', label: labels.tabLegislation, icon: '📜', badge: pendingAlerts },
     { id: 'corrections', label: labels.tabCorrections, icon: '🛠', badge: pendingCorrections },
+    { id: 'analytics',   label: labels.tabAnalytics,   icon: '📈' },
   ]
 
   return (
@@ -450,6 +612,194 @@ export default function SuperAdmin() {
 
         {/* ── Corrections ── */}
         {tab === 'corrections' && <CorrectionsTab />}
+
+        {/* ── Analytics ── */}
+        {tab === 'analytics' && (
+          <div className="max-w-4xl space-y-6">
+            {analyticsLoading && (
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                {labels.loading}
+              </p>
+            )}
+
+            {!analyticsLoading && analyticsData && (
+              <>
+                {/* Active users cards */}
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: labels.activeToday, value: analyticsData.activeToday, icon: '🟢' },
+                    { label: labels.activeWeek,  value: analyticsData.activeWeek,  icon: '📅' },
+                    { label: labels.activeMonth, value: analyticsData.activeMonth, icon: '📆' },
+                  ].map(item => (
+                    <div
+                      key={item.label}
+                      className="rounded-xl p-4"
+                      style={{
+                        backgroundColor: 'var(--surface-card)',
+                        border: '1px solid var(--border)',
+                      }}
+                    >
+                      <p className="text-2xl">{item.icon}</p>
+                      <p
+                        className="text-2xl font-bold mt-1 tabular-nums"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        {item.value}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {item.label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Top pages */}
+                  <div
+                    className="rounded-xl p-4"
+                    style={{
+                      backgroundColor: 'var(--surface-card)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <p
+                      className="text-sm font-semibold mb-3"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {labels.topPages}
+                    </p>
+                    {analyticsData.topPages.length === 0 && (
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {labels.noData}
+                      </p>
+                    )}
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr style={{ color: 'var(--text-muted)' }}>
+                          <th className="text-left pb-1 font-medium">{labels.page}</th>
+                          <th className="text-right pb-1 font-medium">{labels.views}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analyticsData.topPages.map(p => (
+                          <tr key={p.page}>
+                            <td className="py-1 font-mono" style={{ color: 'var(--text-secondary)' }}>
+                              {p.page}
+                            </td>
+                            <td className="py-1 text-right tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                              {p.views}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Top actions */}
+                  <div
+                    className="rounded-xl p-4"
+                    style={{
+                      backgroundColor: 'var(--surface-card)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <p
+                      className="text-sm font-semibold mb-3"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {labels.topActions}
+                    </p>
+                    {analyticsData.topActions.length === 0 && (
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {labels.noData}
+                      </p>
+                    )}
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr style={{ color: 'var(--text-muted)' }}>
+                          <th className="text-left pb-1 font-medium">{labels.action}</th>
+                          <th className="text-right pb-1 font-medium">{labels.count}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analyticsData.topActions.map(a => (
+                          <tr key={a.action}>
+                            <td className="py-1 font-mono" style={{ color: 'var(--text-secondary)' }}>
+                              {a.action}
+                            </td>
+                            <td className="py-1 text-right tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                              {a.count}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Daily activity bar chart */}
+                <div
+                  className="rounded-xl p-4"
+                  style={{
+                    backgroundColor: 'var(--surface-card)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <p
+                    className="text-sm font-semibold mb-3"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {labels.activityChart}
+                  </p>
+                  {(() => {
+                    const maxEvents = Math.max(...analyticsData.dailyActivity.map(d => d.events), 1)
+                    return (
+                      <div className="flex items-end gap-[2px]" style={{ height: 120 }}>
+                        {analyticsData.dailyActivity.map(d => {
+                          const pct = (d.events / maxEvents) * 100
+                          return (
+                            <div
+                              key={d.date}
+                              className="flex-1 rounded-t transition-all"
+                              style={{
+                                height: `${Math.max(pct, 2)}%`,
+                                backgroundColor: d.events > 0 ? 'var(--accent)' : 'var(--border)',
+                                minWidth: 4,
+                              }}
+                              title={`${d.date}: ${d.events}`}
+                            />
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      {analyticsData.dailyActivity[0]?.date.slice(5)}
+                    </span>
+                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                      {analyticsData.dailyActivity[analyticsData.dailyActivity.length - 1]?.date.slice(5)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={loadAnalytics}
+                    disabled={analyticsLoading}
+                    className="text-xs px-3 py-1.5 rounded-lg disabled:opacity-50"
+                    style={{
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    {analyticsLoading ? '...' : labels.refresh}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

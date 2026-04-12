@@ -112,6 +112,10 @@ export const useCompaniesStore = create<CompaniesState>()(
       setActive: (id) => {
         set({ activeCompanyId: id })
 
+        import('../lib/analytics').then(({ trackEvent }) => {
+          trackEvent('company_switched')
+        })
+
         // Synchronously clear all company-scoped state BEFORE loading new data
         // so the UI never shows data from the previous company
         Promise.all([

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { DDSFormData } from '../types'
 import { generateDDSXml, downloadXml } from '../../../lib/xmlGenerator'
 import { generateDDSPdf } from '../../../lib/pdfGenerator'
+import { trackEvent } from '../../../lib/analytics'
 import { DDS_SCHEMA } from '../../../constants/nap-schemas'
 import HelpButton from '../../../components/ui/HelpButton'
 import { BgTermLabel } from '../../../lib/bgTerms'
@@ -169,13 +170,21 @@ export default function DeclarationDDS({ data }: Props) {
 
       <div className="flex flex-wrap gap-3">
         <button
-          onClick={() => downloadXml(generateDDSXml({ ...form, vatPayable, vatRefund }), `DDS_${form.period}.xml`)}
+          onClick={() => {
+            downloadXml(generateDDSXml({ ...form, vatPayable, vatRefund }), `DDS_${form.period}.xml`)
+            trackEvent('report_generated', { report: 'DDS' })
+            trackEvent('document_exported', { format: 'xml' })
+          }}
           className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-medium text-white hover:bg-violet-700"
         >
           XML за e-services.nap.bg
         </button>
         <button
-          onClick={() => generateDDSPdf({ ...form, vatPayable, vatRefund })}
+          onClick={() => {
+            generateDDSPdf({ ...form, vatPayable, vatRefund })
+            trackEvent('report_generated', { report: 'DDS' })
+            trackEvent('document_exported', { format: 'pdf' })
+          }}
           className="rounded-lg border border-violet-200 px-5 py-2 text-sm text-violet-600 hover:bg-violet-50"
         >
           PDF чернова

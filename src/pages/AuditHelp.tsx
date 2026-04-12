@@ -14,6 +14,7 @@ import { useExportWithWarning } from '../hooks/useExportWithWarning'
 import ExportWarningModal from '../components/ui/ExportWarningModal'
 import { generateAuditAnswer } from '../lib/auditLLM'
 import type { AuditTemplate, AuditLang } from '../constants/audit-templates'
+import { trackEvent } from '../lib/analytics'
 
 type Category = AuditTemplate['category']
 
@@ -232,6 +233,7 @@ export default function AuditHelp() {
         a.download = `explanatory_note_${templateId}.pdf`
         a.click()
         URL.revokeObjectURL(url)
+        trackEvent('document_exported', { format: 'pdf' })
       },
     })
   }
@@ -252,7 +254,10 @@ export default function AuditHelp() {
       },
       language,
     )
-    if (note) setGenerated(note)
+    if (note) {
+      setGenerated(note)
+      trackEvent('audit_template_used', { templateId })
+    }
   }
 
   const copy = async (text: string, tag: string) => {

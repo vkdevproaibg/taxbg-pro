@@ -3,6 +3,7 @@ import {
   Archive, ChevronRight, ChevronDown, Folder, FolderOpen,
   FileText, FileCode, FileSpreadsheet, Upload, Download, Trash2, Sparkles, AlertTriangle,
 } from 'lucide-react'
+import { trackEvent } from '../lib/analytics'
 import { useUserStore, type AppLanguage } from '../store/userStore'
 import { useCompaniesStore } from '../store/companiesStore'
 import { useAccountingStore } from '../store/accountingStore'
@@ -383,6 +384,7 @@ export default function Vault() {
             language,
           )
           triggerBlobDownload(blob, `TaxBG_Vault_${(companyName || 'company').replace(/\s+/g, '_')}.zip`)
+          trackEvent('document_exported', { format: 'zip' })
         } catch (err) {
           console.error('[vault] zip export failed', err)
         }
