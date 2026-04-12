@@ -1,8 +1,15 @@
 import { useState } from 'react'
 import TestRunnerTab from '../modules/testing/TestRunnerTab'
 import UnitTestTab from '../modules/testing/UnitTestTab'
+import IntegrationTestRunner from '../modules/testing/IntegrationTestRunner'
 
-type Tab = 'scenarios' | 'unit'
+type Tab = 'scenarios' | 'unit' | 'integration'
+
+const TAB_LABELS: Record<Tab, string> = {
+  scenarios:   'Сценарии',
+  unit:        'Unit Tests',
+  integration: 'Интеграционный',
+}
 
 export default function Testing() {
   const [tab, setTab] = useState<Tab>('scenarios')
@@ -15,7 +22,7 @@ export default function Testing() {
           🧪 Тестирование
         </h1>
         <div className="flex gap-4 mt-3">
-          {(['scenarios', 'unit'] as Tab[]).map(t => (
+          {(['scenarios', 'unit', 'integration'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -25,13 +32,15 @@ export default function Testing() {
                 color: tab === t ? 'var(--accent-text)' : 'var(--text-muted)',
               }}
             >
-              {t === 'scenarios' ? 'Сценарии' : 'Unit Tests'}
+              {TAB_LABELS[t]}
             </button>
           ))}
         </div>
       </div>
       <div className="flex-1 overflow-auto">
-        {tab === 'scenarios' ? <TestRunnerTab /> : <UnitTestTab />}
+        {tab === 'scenarios'   && <TestRunnerTab />}
+        {tab === 'unit'        && <UnitTestTab />}
+        {tab === 'integration' && <IntegrationTestRunner />}
       </div>
     </div>
   )
