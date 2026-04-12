@@ -455,7 +455,7 @@ function downloadChecksCsv(result: IntegrationTestResult, labels: typeof T['ru']
   const rows = result.checks.map(c => [
     c.id,
     c.name,
-    c.passed ? 'PASS' : 'FAIL',
+    c.skipped ? 'SKIP' : c.passed ? 'PASS' : 'FAIL',
     c.expected,
     c.actual,
     c.details ?? '',
@@ -574,6 +574,7 @@ export default function IntegrationTestRunner() {
             </p>
             <p className="text-sm mt-1" style={{ color: result.overallStatus === 'PASS' ? '#166534' : '#b91c1c' }}>
               {result.passedChecks} {L.checksOf} {result.totalChecks} {L.passed}
+              {result.skippedChecks > 0 && ` · ⏭ ${result.skippedChecks} SKIP`}
               {' · '}{L.durationMs}: {result.durationMs} {L.ms}
             </p>
           </div>
@@ -883,13 +884,14 @@ export default function IntegrationTestRunner() {
                     className="border-t"
                     style={{
                       borderColor: 'var(--border)',
-                      backgroundColor: c.passed ? 'transparent' : '#fef2f2',
+                      backgroundColor: c.skipped ? 'transparent' : c.passed ? 'transparent' : '#fef2f2',
+                      opacity: c.skipped ? 0.55 : 1,
                     }}>
                     <Td mono>{c.id}</Td>
                     <Td>{c.name}</Td>
                     <Td>
-                      <span style={{ color: c.passed ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
-                        {c.passed ? '✅' : '❌'}
+                      <span style={{ color: c.skipped ? '#6b7280' : c.passed ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                        {c.skipped ? '⏭' : c.passed ? '✅' : '❌'}
                       </span>
                     </Td>
                     <Td mono>{c.expected}</Td>

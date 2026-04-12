@@ -198,7 +198,8 @@ export function buildBalanceSheet(
   )
 
   const currentAssets = debtorsBalance
-  const totalAssets   = fixedAssets + currentAssets + bankBalance
+  // totalAssets is finalized below after dynamic account scanning
+  let totalAssets   = fixedAssets + currentAssets + bankBalance
 
   // ── ПАСИВИ ──────────────────────────────────
 
@@ -210,7 +211,7 @@ export function buildBalanceSheet(
   // If no capital entries exist yet, use minimum (1 €).
   // A capital entry (Дт 503 / Кт 102) should be created
   // when the company is first set up.
-  const capitalAmount = capitalFromEntries > 0 ? capitalFromEntries : 1
+  const capitalAmount = capitalFromEntries > 0 ? capitalFromEntries : 0
 
   // Creditors (401 — Задължения към доставчици)
   const creditorsBalance = Math.max(
@@ -252,12 +253,67 @@ export function buildBalanceSheet(
     .filter(t => t.date <= upToDate && t.type === 'vehicle_expense')
     .reduce((s, t) => s + t.amount * (1 - (t.deductiblePercent ?? 0.5)), 0)
 
-  const { netProfit } = calculateCorporateTax(financialResult, nonDeductible, upToDate)
+  const { corporateTax: corpTax, netProfit } = calculateCorporateTax(financialResult, nonDeductible, upToDate)
 
   const retainedEarnings = sumAccount('122', 'credit') - sumAccount('122', 'debit')
 
+  // ── Dynamic handling of accounts not explicitly listed above ──────────────
+  // Ensures any account from the Bulgarian National Chart of Accounts (Националния
+  // сметкоплан) is included in the balance, even if not hardcoded here.
+  // Known accounts are already handled above — skip them to avoid double-counting.
+  const HANDLED_ACCOUNTS = new Set([
+    '501','503','505',
+    '205','206','207','241','246','247',
+    '411',
+    '101','102','122',
+    '401','421','451','452','453',
+    '601','602','603','604','605','606','607','608','609',
+    '703','705','706','709',
+    '721','722','723','724','725','726','727','728','729',
+  ])
+
+  let extraAssets = 0
+  let extraLiab   = 0
+
+  const allJournalAccounts = new Set<string>()
+  for (const e of entries) {
+    if (e.date <= upToDate) {
+      allJournalAccounts.add(e.debitAccount)
+      allJournalAccounts.add(e.creditAccount)
+    }
+  }
+
+  for (const acc of allJournalAccounts) {
+    if (HANDLED_ACCOUNTS.has(acc)) continue
+    const db  = sumAccount(acc, 'debit')
+    const cr  = sumAccount(acc, 'credit')
+    const net = db - cr
+    const cls = parseInt(acc[0])
+    if (isNaN(cls)) continue
+    if (cls === 2 || cls === 3 || cls === 5) {
+      // Fixed assets / inventory / cash — net includes contra accounts (negative)
+      extraAssets += net
+    } else if (cls === 4) {
+      // Active-passive: debit balance = asset (e.g. 493 receivable), credit = liability
+      if (net > 0) extraAssets += net
+      else         extraLiab   += -net
+    } else if (cls === 1) {
+      // Additional equity accounts not in the hardcoded set
+      if (net < 0) extraLiab += -net
+    }
+    // 6xx, 7xx: P&L accounts — captured in financialResult, not in balance directly
+  }
+
+  // Implicit corporate tax payable: tax accrued in OPR but not yet journalized as
+  // account 453 entries. Without this, bank (503) still holds the unremitted tax
+  // while netProfit already deducts it — causing an assets > passive imbalance.
+  const tax453Balance = Math.max(sumAccount('453', 'credit') - sumAccount('453', 'debit'), 0)
+  const implicitTaxPayable = Math.max(corpTax - tax453Balance, 0)
+
+  totalAssets += extraAssets
+
   const totalLiabilities =
-    creditorsBalance + vatPayable + salaryPayable + taxPayable
+    creditorsBalance + vatPayable + salaryPayable + taxPayable + extraLiab + implicitTaxPayable
 
   const totalPassive = capitalAmount + retainedEarnings + netProfit + totalLiabilities
 

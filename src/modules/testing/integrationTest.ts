@@ -133,6 +133,7 @@ export interface IntegrationTestResult {
     id: string
     name: string
     passed: boolean
+    skipped?: boolean
     expected: string
     actual: string
     details?: string
@@ -140,6 +141,7 @@ export interface IntegrationTestResult {
   totalChecks: number
   passedChecks: number
   failedChecks: number
+  skippedChecks: number
   overallStatus: 'PASS' | 'FAIL'
   generatedAt: string
   durationMs: number
@@ -488,6 +490,7 @@ interface CheckResult {
   id: string
   name: string
   passed: boolean
+  skipped?: boolean
   expected: string
   actual: string
   details?: string
@@ -502,6 +505,10 @@ function check(
   details?: string,
 ): CheckResult {
   return { id, name, passed, expected, actual, details }
+}
+
+function checkSkip(id: string, name: string, reason: string): CheckResult {
+  return { id, name, passed: true, skipped: true, expected: 'SKIP', actual: reason }
 }
 
 function near(a: number, b: number, eps = 0.01): boolean {
@@ -1014,9 +1021,10 @@ export async function runIntegrationTest(
     ))
   }
 
-  // C7: totalExpenses = expense + salary + depreciation + vehicle (deductible part)
+  // C7: totalExpenses = expense + vat_in + salary + depreciation + vehicle (deductible part)
+  // vat_in generates a Дт602/Кт503 entry (purchase cost → 602 external services)
   {
-    const expenseTypes: TransactionType[] = ['expense','salary','depreciation','vehicle_tax','vehicle_expense','asset_purchase']
+    const expenseTypes: TransactionType[] = ['expense','vat_in','salary','depreciation','vehicle_tax','vehicle_expense','asset_purchase']
     const expTxs = transactions.filter(t => expenseTypes.includes(t.type))
     // vehicle_expense: only deductible part counts in journal (50%)
     const expectedExp = expTxs.reduce((s, t) => {
@@ -1260,9 +1268,9 @@ export async function runIntegrationTest(
       ))
     }
   } else {
-    // No employees — mark payroll checks as N/A (pass)
+    // No employees — skip payroll checks (not applicable for this scenario)
     for (const id of ['C18','C19','C20','C21','C22']) {
-      checks.push(check(id, `Осигуровки (${id}) — N/A (без служители)`, 'N/A', 'N/A', true))
+      checks.push(checkSkip(id, `Осигуровки (${id})`, 'Сценарий без служители — неприложимо'))
     }
   }
 
@@ -1384,9 +1392,11 @@ export async function runIntegrationTest(
 
   // ── Summary ────────────────────────────────────────────────────────────────
 
-  const totalChecks  = checks.length
-  const passedChecks = checks.filter(c => c.passed).length
-  const failedChecks = totalChecks - passedChecks
+  const activeChecks  = checks.filter(c => !c.skipped)
+  const totalChecks   = activeChecks.length
+  const passedChecks  = activeChecks.filter(c => c.passed).length
+  const failedChecks  = totalChecks - passedChecks
+  const skippedChecks = checks.length - activeChecks.length
 
   return {
     company,
@@ -1402,6 +1412,7 @@ export async function runIntegrationTest(
     totalChecks,
     passedChecks,
     failedChecks,
+    skippedChecks,
     overallStatus: failedChecks === 0 ? 'PASS' : 'FAIL',
     generatedAt: new Date().toISOString(),
     durationMs: Math.round(performance.now() - t0),
