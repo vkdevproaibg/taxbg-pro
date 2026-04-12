@@ -5,10 +5,43 @@ import type { Company } from '../store/companiesStore'
 import type { RelationType } from '../store/groupStore'
 import HelpButton from '../components/ui/HelpButton'
 import GroupOptimizer from '../modules/companies/GroupOptimizer'
+import TransferWizard from '../modules/companies/TransferWizard'
 import { ensureCapitalEntry } from '../lib/journalAI'
 import { useAuthStore } from '../store/authStore'
+import { useUserStore, type AppLanguage } from '../store/userStore'
 import { usePaywall } from '../hooks/usePaywall'
 import PaywallModal from '../components/ui/PaywallModal'
+import { claimTransferAsBuyer } from '../lib/companyTransfer'
+
+const TRANSFER_LABEL: Record<AppLanguage, string> = {
+  ru: 'Продажба / Передача',
+  en: 'Sale / Transfer',
+  bg: 'Продажба / Прехвърляне',
+  uk: 'Продаж / Передача',
+}
+
+const PENDING_TEXT: Record<AppLanguage, { intro: string; accept: string; dismiss: string }> = {
+  ru: {
+    intro: 'Вам передана компания',
+    accept: 'Принять',
+    dismiss: 'Позже',
+  },
+  en: {
+    intro: 'A company was transferred to you',
+    accept: 'Accept',
+    dismiss: 'Later',
+  },
+  bg: {
+    intro: 'Прехвърлено ви е дружество',
+    accept: 'Приеми',
+    dismiss: 'По-късно',
+  },
+  uk: {
+    intro: 'Вам передано компанію',
+    accept: 'Прийняти',
+    dismiss: 'Пізніше',
+  },
+}
 
 type CompaniesTab = 'companies' | 'optimizer'
 
@@ -29,12 +62,16 @@ function CompanyCard({
   onActivate,
   onEdit,
   onDelete,
+  onTransfer,
+  transferLabel,
 }: {
   company: Company
   isActive: boolean
   onActivate: () => void
   onEdit: () => void
   onDelete: () => void
+  onTransfer: () => void
+  transferLabel: string
 }) {
   const countryLabel = COUNTRY_OPTIONS.find(c => c.code === company.country)?.label ?? company.country
 
@@ -102,6 +139,15 @@ function CompanyCard({
               backgroundColor: 'var(--surface)',
             }}>
             Редактировать
+          </button>
+          <button onClick={onTransfer}
+            className="rounded-lg px-3 py-1.5 text-xs transition-colors"
+            style={{
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
+              backgroundColor: 'var(--surface)',
+            }}>
+            {transferLabel}
           </button>
           <button onClick={onDelete}
             className="rounded-lg px-3 py-1.5 text-xs transition-colors ml-auto"
@@ -314,7 +360,21 @@ export default function Companies() {
     companies, activeCompanyId, isSynced,
     addCompany, updateCompany, removeCompany, setActive,
   } = useCompaniesStore()
-  const { isDemo } = useAuthStore()
+  const { isDemo, user, pendingTransfers, refreshPendingTransfers, dismissPendingTransfer } = useAuthStore()
+  const language = useUserStore((s) => s.language)
+  const pendingText = PENDING_TEXT[language] ?? PENDING_TEXT.bg
+
+  const handleAcceptPending = async (transferId: string) => {
+    if (!user) return
+    const { error } = await claimTransferAsBuyer(transferId, user.id)
+    if (!error) {
+      dismissPendingTransfer(transferId)
+      await refreshPendingTransfers()
+      // Reload companies from Supabase to pick up newly granted access
+      const { useCompaniesStore: cs } = await import('../store/companiesStore')
+      await cs.getState().initFromSupabase(user.id)
+    }
+  }
   const { relations, addRelation, removeRelation } = useGroupStore()
   const { checkAccess } = usePaywall()
 
@@ -329,6 +389,10 @@ export default function Companies() {
   const [relPct,          setRelPct]          = useState(100)
   const [relFlow,         setRelFlow]         = useState(0)
   const [relNotes,        setRelNotes]        = useState('')
+  const [transferId,      setTransferId]      = useState<string | null>(null)
+
+  const transferLabel = TRANSFER_LABEL[language] ?? TRANSFER_LABEL.bg
+  const transferCompany = companies.find((c) => c.id === transferId) ?? null
 
   const handleAddCompany = (data: Omit<Company, 'id' | 'createdAt'>) => {
     const id = addCompany(data)
@@ -400,6 +464,42 @@ export default function Companies() {
       {tab === 'companies' && (
       <div className="space-y-6 p-6">
 
+      {/* Pending transfer banner(s) */}
+      {!isDemo && pendingTransfers.length > 0 && (
+        <div className="space-y-2">
+          {pendingTransfers.map((pt) => (
+            <div key={pt.id}
+              className="rounded-xl p-4 flex items-start gap-3 flex-wrap"
+              style={{
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fbbf24',
+              }}>
+              <div className="text-xl">🎁</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium" style={{ color: '#92400e' }}>
+                  {pendingText.intro}: <b>{pt.companyName}</b>
+                </div>
+                <div className="text-xs mt-0.5" style={{ color: '#92400e' }}>
+                  {pt.sharesPct}% · {pt.transferDate}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => handleAcceptPending(pt.id)}
+                  className="rounded-xl px-4 py-2 text-xs font-semibold text-white"
+                  style={{ backgroundColor: '#d97706' }}>
+                  {pendingText.accept}
+                </button>
+                <button onClick={() => dismissPendingTransfer(pt.id)}
+                  className="rounded-xl px-4 py-2 text-xs"
+                  style={{ border: '1px solid #fbbf24', color: '#92400e' }}>
+                  {pendingText.dismiss}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Sync notice */}
       {!isDemo && isSynced && companies.length > 0 && (
         <div className="rounded-xl p-3"
@@ -457,6 +557,8 @@ export default function Companies() {
               isActive={company.id === activeCompanyId}
               onActivate={() => setActive(company.id)}
               onEdit={() => setEditingId(company.id)}
+              onTransfer={() => setTransferId(company.id)}
+              transferLabel={transferLabel}
               onDelete={() => {
                 if (companies.length > 1) removeCompany(company.id)
               }}
@@ -658,6 +760,13 @@ export default function Companies() {
         <PaywallModal
           reason={paywallReason}
           onClose={() => setPaywallReason(null)}
+        />
+      )}
+
+      {transferCompany && (
+        <TransferWizard
+          company={transferCompany}
+          onClose={() => setTransferId(null)}
         />
       )}
     </div>

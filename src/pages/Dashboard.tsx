@@ -69,7 +69,10 @@ function AccountantDashboard() {
   const unresolvedCritical = getUnresolvedCritical()
   const dataReady = useCompanyDataReady()
   const { canApprove, needsApproval } = useCompanyRole()
-  const pendingTransactions = useAccountingStore((s) => s.getPendingTransactions())
+  // Count pending via a stable primitive selector — avoids new-array-on-every-render infinite loop
+  const pendingCount = useAccountingStore((s) =>
+    s.transactions.filter((t) => t.status === 'pending_approval').length
+  )
 
   const totalIn  = transactions
     .filter((t) => ['income','vat_out','appstore','googleplay','stripe'].includes(t.type))
@@ -144,7 +147,7 @@ function AccountantDashboard() {
       )}
 
       {/* Pending approval card */}
-      {canApprove && needsApproval && pendingTransactions.length > 0 && (
+      {canApprove && needsApproval && pendingCount > 0 && (
         <div
           className="rounded-xl p-4 flex items-center justify-between gap-3"
           style={{ backgroundColor: 'var(--warning-light, #fffbeb)', border: '1.5px solid #f59e0b' }}
@@ -152,11 +155,11 @@ function AccountantDashboard() {
           <div>
             <p className="font-semibold text-sm text-amber-800">
               {{
-                ru: `${pendingTransactions.length} транзакц${pendingTransactions.length === 1 ? 'ия' : pendingTransactions.length < 5 ? 'ии' : 'ий'} ожидают утверждения`,
-                en: `${pendingTransactions.length} transaction${pendingTransactions.length !== 1 ? 's' : ''} awaiting approval`,
-                bg: `${pendingTransactions.length} транзакц${pendingTransactions.length === 1 ? 'ия' : 'ии'} чак${pendingTransactions.length === 1 ? 'а' : 'ат'} одобрение`,
-                uk: `${pendingTransactions.length} транзакц${pendingTransactions.length === 1 ? 'ія' : pendingTransactions.length < 5 ? 'ії' : 'ій'} очікують затвердження`,
-              }[language] ?? `${pendingTransactions.length} транзакции чакат одобрение`}
+                ru: `${pendingCount} транзакц${pendingCount === 1 ? 'ия' : pendingCount < 5 ? 'ии' : 'ий'} ожидают утверждения`,
+                en: `${pendingCount} transaction${pendingCount !== 1 ? 's' : ''} awaiting approval`,
+                bg: `${pendingCount} транзакц${pendingCount === 1 ? 'ия' : 'ии'} чак${pendingCount === 1 ? 'а' : 'ат'} одобрение`,
+                uk: `${pendingCount} транзакц${pendingCount === 1 ? 'ія' : pendingCount < 5 ? 'ії' : 'ій'} очікують затвердження`,
+              }[language] ?? `${pendingCount} транзакции чакат одобрение`}
             </p>
           </div>
           <button

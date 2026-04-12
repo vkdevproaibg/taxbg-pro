@@ -14,7 +14,7 @@ const ADMIN_LABEL: Record<string, string> = {
 
 export default function BottomBar() {
   const t = useT()
-  const { profile } = useAuthStore()
+  const profileRole = useAuthStore(s => s.profile?.role)
   const language = useUserStore(s => s.language) || 'ru'
   const pendingAlerts = useLegislationStore(s => s.getPendingCount())
   const currentYear = new Date().getFullYear()
@@ -75,7 +75,7 @@ export default function BottomBar() {
             <span>Виза D</span>
           </NavLink>
 
-          {profile?.role === 'superadmin' && (
+          {profileRole === 'superadmin' && (
             <NavLink
               to="/superadmin"
               className={({ isActive }) =>

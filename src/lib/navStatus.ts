@@ -40,12 +40,20 @@ export function useNavStatus(): NavStatusMap {
   const transactions = useAccountingStore(s => s.transactions)
   const entries      = useJournalStore(s => s.entries)
   const employees    = useEmployeesStore(s => s.employees)
-  const company      = useCompaniesStore(s => s.getActive())
-  const profile    = useAuthStore(s => s.profile)
-  const isSuperAdmin = profile?.role === 'superadmin'
+  // Select primitive fields to avoid new-object-reference on every render
+  const companyName  = useCompaniesStore(s => s.companies.find(c => c.id === s.activeCompanyId)?.name ?? null)
+  const companyEik   = useCompaniesStore(s => s.companies.find(c => c.id === s.activeCompanyId)?.eik ?? null)
+  const companyHasVat= useCompaniesStore(s => s.companies.find(c => c.id === s.activeCompanyId)?.hasVat ?? false)
+  const profileRole  = useAuthStore(s => s.profile?.role)
+  const isSuperAdmin = profileRole === 'superadmin'
   const pendingAlertsCount = useLegislationStore(s =>
     s.alerts.filter(a => a.status === 'pending').length
   )
+
+  // Reconstruct a minimal company shape for downstream logic
+  const company = companyName != null
+    ? { name: companyName, eik: companyEik, hasVat: companyHasVat }
+    : null
 
   const now   = new Date()
   const year  = now.getFullYear()

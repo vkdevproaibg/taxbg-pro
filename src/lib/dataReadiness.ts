@@ -13,19 +13,20 @@ export interface DataReadiness {
 export function useDataReadiness(): DataReadiness {
   const { companyName, eik } = useUserStore()
   const transactions = useAccountingStore((s) => s.transactions)
-  const { companies, getActive } = useCompaniesStore()
+  // Select individual fields to avoid new-object-reference churn on every render
+  const activeCompanyName = useCompaniesStore((s) =>
+    s.companies.find((c) => c.id === s.activeCompanyId)?.name ?? null
+  )
+  const activeCompanyEik = useCompaniesStore((s) =>
+    s.companies.find((c) => c.id === s.activeCompanyId)?.eik ?? null
+  )
 
-  // Prefer active company data over userStore fallback
-  const activeCompany = getActive()
-  const effectiveName = activeCompany?.name || companyName
-  const effectiveEik  = activeCompany?.eik  || eik
+  const effectiveName = activeCompanyName || companyName
+  const effectiveEik  = activeCompanyEik  || eik
 
   const hasCompany      = effectiveName.trim().length > 0
   const hasEik          = effectiveEik.trim().length >= 9
   const hasTransactions = transactions.length > 0
-
-  // suppress unused variable warning — companies is used for context
-  void companies
 
   const missingSteps: string[] = []
   if (!hasCompany)      missingSteps.push('Введите название компании в Настройки → Профил')

@@ -1,6 +1,10 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import type { Session, User } from '@supabase/supabase-js'
+import {
+  findPendingTransfersForEmail,
+  type PendingTransferSummary,
+} from '../lib/companyTransfer'
 
 interface Profile {
   id: string
@@ -18,12 +22,15 @@ interface AuthState {
   profile:     Profile | null
   isLoading:   boolean
   isDemo:      boolean  // true = unauthenticated demo mode
+  pendingTransfers: PendingTransferSummary[]
 
   initialize:  () => Promise<void>
   signIn:      (email: string, password: string) => Promise<string | null>
   signUp:      (email: string, password: string, language?: string) => Promise<string | null>
   signOut:     () => Promise<void>
   fetchProfile: () => Promise<void>
+  refreshPendingTransfers: () => Promise<void>
+  dismissPendingTransfer: (id: string) => void
 
   // Helpers
   isSuperAdmin: () => boolean
@@ -38,6 +45,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   profile:   null,
   isLoading: true,
   isDemo:    true,
+  pendingTransfers: [],
 
   initialize: async () => {
     if (!supabase) {
@@ -142,9 +150,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } catch (err) {
         console.warn('[authStore] loadTaxRates failed:', err)
       }
+
+      // Check for pending company transfers addressed to this user
+      await get().refreshPendingTransfers()
     }
 
     set({ isLoading: false })
+  },
+
+  refreshPendingTransfers: async () => {
+    const email = get().user?.email
+    if (!email) {
+      set({ pendingTransfers: [] })
+      return
+    }
+    try {
+      const pending = await findPendingTransfersForEmail(email)
+      set({ pendingTransfers: pending })
+    } catch (err) {
+      console.warn('[authStore] refreshPendingTransfers failed:', err)
+    }
+  },
+
+  dismissPendingTransfer: (id: string) => {
+    set((s) => ({
+      pendingTransfers: s.pendingTransfers.filter((t) => t.id !== id),
+    }))
   },
 
   isSuperAdmin: () => get().profile?.role === 'superadmin',

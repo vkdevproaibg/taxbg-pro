@@ -277,9 +277,11 @@ export default function OwnerDashboard() {
   const journalEntries = useJournalStore((s) => s.entries)
   const bankBalance503 = useJournalStore((s) => s.bankBalance)
   const notifications = useNotificationsStore((s) => s.notifications)
-  const vaultUploads = useVaultUploadsStore((s) =>
-    activeCompanyId ? s.getForCompany(activeCompanyId) : s.uploads,
-  )
+  // Use stable selector (count, not filtered array) to avoid new-reference infinite loop
+  const allUploads = useVaultUploadsStore((s) => s.uploads)
+  const vaultUploads = activeCompanyId
+    ? allUploads.filter((u) => u.companyId === activeCompanyId)
+    : allUploads
 
   const [periodMode, setPeriodMode] = useState<PeriodMode>('month')
   const [bizExpanded, setBizExpanded] = useState(false)
