@@ -191,6 +191,10 @@ const translations = {
     onboarding_vat_title: 'ДДС и сотрудники',
     onboarding_done_title: 'Всё готово!',
     onboarding_enter: 'Войти в приложение 🌹',
+    terms_accept_label: 'Я ознакомился с',
+    terms_link: 'Условиями использования',
+    terms_and: 'и',
+    privacy_link: 'Политикой конфиденциальности',
 
     // Legal reference
     legal_today_tab: 'Сегодня актуально',
@@ -383,6 +387,10 @@ const translations = {
     onboarding_vat_title: 'ПДВ і співробітники',
     onboarding_done_title: 'Все готово!',
     onboarding_enter: 'Увійти в додаток 🌹',
+    terms_accept_label: 'Я ознайомився з',
+    terms_link: 'Умовами використання',
+    terms_and: 'та',
+    privacy_link: 'Політикою конфіденційності',
 
     legal_today_tab: 'Сьогодні актуально',
     legal_all_tab: 'Всі закони',
@@ -571,6 +579,10 @@ const translations = {
     onboarding_vat_title: 'VAT and employees',
     onboarding_done_title: 'All done!',
     onboarding_enter: 'Enter the app 🌹',
+    terms_accept_label: 'I have read and agree to the',
+    terms_link: 'Terms of Service',
+    terms_and: 'and',
+    privacy_link: 'Privacy Policy',
 
     legal_today_tab: 'Today relevant',
     legal_all_tab: 'All laws',
@@ -759,6 +771,10 @@ const translations = {
     onboarding_vat_title: 'ДДС и служители',
     onboarding_done_title: 'Готово!',
     onboarding_enter: 'Влез в приложението 🌹',
+    terms_accept_label: 'Запознах се с',
+    terms_link: 'Общите условия',
+    terms_and: 'и',
+    privacy_link: 'Политиката за поверителност',
 
     legal_today_tab: 'Днес актуално',
     legal_all_tab: 'Всички закони',

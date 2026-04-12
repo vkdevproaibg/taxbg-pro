@@ -30,6 +30,9 @@ import Onboarding from './modules/onboarding'
 import SuperAdmin from './pages/SuperAdmin'
 import AuditHelp from './pages/AuditHelp'
 import Vault from './pages/Vault'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
+import AIDisclosure from './pages/AIDisclosure'
 import { useUserStore } from './store/userStore'
 import { useAccountingStore } from './store/accountingStore'
 import { useCompaniesStore } from './store/companiesStore'
@@ -109,6 +112,9 @@ function App() {
   return (
     <Routes>
       <Route path="/auth" element={<Auth />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/ai-disclosure" element={<AIDisclosure />} />
       <Route path="/*" element={
         <Layout>
           <DemoBanner />

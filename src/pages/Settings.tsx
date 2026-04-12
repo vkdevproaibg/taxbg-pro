@@ -1,7 +1,10 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { getAuditSummary } from '../lib/taxRatesAudit'
 import { useUserStore } from '../store/userStore'
 import { useIntegrationsStore } from '../store/integrationsStore'
+import { usePurgeStore } from '../store/purgeStore'
+import PurgeAccountModal from '../components/ui/PurgeAccountModal'
 import type { AppLanguage, LegalForm } from '../store/userStore'
 import { fetchOpenRouterModels } from '../lib/llmCatalog'
 import { useT } from '../lib/useT'
@@ -958,6 +961,9 @@ export default function Settings() {
               </div>
             </div>
           )}
+
+          <LegalLinksSection />
+          <PurgeAccountSection />
         </div>
       </div>
     </div>
@@ -1035,5 +1041,152 @@ function ViewModeSection() {
         })}
       </div>
     </div>
+  )
+}
+
+const LEGAL_LINKS_TEXTS: Record<AppLanguage, {
+  title: string
+  privacy: string
+  terms: string
+  aiDisclosure: string
+}> = {
+  ru: { title: 'Правовая информация', privacy: 'Политика конфиденциальности', terms: 'Условия использования', aiDisclosure: 'AI Disclosure' },
+  uk: { title: 'Правова інформація', privacy: 'Політика конфіденційності', terms: 'Умови використання', aiDisclosure: 'AI Disclosure' },
+  en: { title: 'Legal information', privacy: 'Privacy Policy', terms: 'Terms of Service', aiDisclosure: 'AI Disclosure' },
+  bg: { title: 'Правна информация', privacy: 'Политика за поверителност', terms: 'Общи условия', aiDisclosure: 'AI Disclosure' },
+}
+
+function LegalLinksSection() {
+  const language = useUserStore((s) => s.language)
+  const texts = LEGAL_LINKS_TEXTS[language] ?? LEGAL_LINKS_TEXTS.ru
+  return (
+    <div style={cardStyle}>
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        {texts.title}
+      </h2>
+      <div className="flex flex-wrap gap-3 text-sm">
+        <Link to="/privacy" className="text-blue-600 hover:underline">{texts.privacy}</Link>
+        <Link to="/terms" className="text-blue-600 hover:underline">{texts.terms}</Link>
+        <Link to="/ai-disclosure" className="text-blue-600 hover:underline">{texts.aiDisclosure}</Link>
+      </div>
+    </div>
+  )
+}
+
+const PURGE_TEXTS: Record<AppLanguage, {
+  title: string
+  warning: string
+  button: string
+  existingTitle: string
+  existingMessage: (date: string) => string
+  cancelBtn: string
+  cancelling: string
+  cancelError: string
+}> = {
+  ru: {
+    title: 'Удаление аккаунта',
+    warning: '⚠ Удаление аккаунта необратимо. Все данные будут удалены через 90 дней после запроса. Скачайте архив документов ПЕРЕД удалением.',
+    button: 'Запросить удаление аккаунта',
+    existingTitle: 'Заявка на удаление активна',
+    existingMessage: (d) => `Аккаунт будет удалён ${d}. Вы можете отменить заявку до этой даты.`,
+    cancelBtn: 'Отменить заявку',
+    cancelling: 'Отмена...',
+    cancelError: 'Не удалось отменить.',
+  },
+  uk: {
+    title: 'Видалення акаунта',
+    warning: '⚠ Видалення акаунта незворотне. Усі дані будуть видалені через 90 днів після запиту. Завантажте архів документів ПЕРЕД видаленням.',
+    button: 'Запитати видалення акаунта',
+    existingTitle: 'Заявку на видалення подано',
+    existingMessage: (d) => `Акаунт буде видалено ${d}. Ви можете скасувати заявку до цієї дати.`,
+    cancelBtn: 'Скасувати заявку',
+    cancelling: 'Скасування...',
+    cancelError: 'Не вдалося скасувати.',
+  },
+  en: {
+    title: 'Delete account',
+    warning: '⚠ Account deletion is irreversible. All data will be deleted 90 days after the request. Download the document archive BEFORE deleting.',
+    button: 'Request account deletion',
+    existingTitle: 'Deletion request is active',
+    existingMessage: (d) => `Account will be deleted on ${d}. You can cancel the request before that date.`,
+    cancelBtn: 'Cancel request',
+    cancelling: 'Cancelling...',
+    cancelError: 'Failed to cancel.',
+  },
+  bg: {
+    title: 'Изтриване на акаунт',
+    warning: '⚠ Изтриването на акаунта е необратимо. Всички данни ще бъдат изтрити 90 дни след заявката. Свалете архива на документите ПРЕДИ изтриване.',
+    button: 'Поискай изтриване на акаунт',
+    existingTitle: 'Заявката за изтриване е активна',
+    existingMessage: (d) => `Акаунтът ще бъде изтрит на ${d}. Можете да отмените заявката преди тази дата.`,
+    cancelBtn: 'Отмени заявката',
+    cancelling: 'Отменя се...',
+    cancelError: 'Неуспешна отмяна.',
+  },
+}
+
+function PurgeAccountSection() {
+  const language = useUserStore((s) => s.language)
+  const purgeRequestedAt = usePurgeStore((s) => s.purgeRequestedAt)
+  const purgeScheduledAt = usePurgeStore((s) => s.purgeScheduledAt)
+  const cancelPurge = usePurgeStore((s) => s.cancelPurge)
+  const texts = PURGE_TEXTS[language] ?? PURGE_TEXTS.ru
+  const [modalOpen, setModalOpen] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+
+  const handleCancel = async () => {
+    setCancelling(true)
+    setCancelError(null)
+    const err = await cancelPurge()
+    setCancelling(false)
+    if (err) setCancelError(texts.cancelError)
+  }
+
+  const formatDate = (iso: string) => {
+    const locale = language === 'bg' ? 'bg-BG' : language === 'uk' ? 'uk-UA' : language === 'en' ? 'en-GB' : 'ru-RU'
+    try { return new Date(iso).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }) }
+    catch { return iso.slice(0, 10) }
+  }
+
+  return (
+    <>
+      <div style={{ ...cardStyle, border: '2px solid #fca5a5' }}>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-red-700">
+          {texts.title}
+        </h2>
+
+        {purgeRequestedAt && purgeScheduledAt ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-red-800">{texts.existingTitle}</p>
+            <p className="text-sm text-red-700">{texts.existingMessage(formatDate(purgeScheduledAt))}</p>
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="rounded-xl border border-red-400 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+            >
+              {cancelling ? texts.cancelling : texts.cancelBtn}
+            </button>
+            {cancelError && <p className="text-xs text-red-600">{cancelError}</p>}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-900">
+              {texts.warning}
+            </p>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              {texts.button}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <PurgeAccountModal open={modalOpen} onClose={() => setModalOpen(false)} />
+    </>
   )
 }

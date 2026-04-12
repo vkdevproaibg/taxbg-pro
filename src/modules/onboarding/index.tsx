@@ -31,6 +31,7 @@ export default function Onboarding() {
   const [hasEmployees, setHasEmployees] = useState(false)
   const [showAudit,    setShowAudit]    = useState(false)
   const [saving,       setSaving]       = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   const finish = async () => {
     setSaving(true)
@@ -356,6 +357,28 @@ export default function Onboarding() {
                   принятые решения.
                 </p>
               </div>
+
+              <label className="flex items-start gap-2 rounded-xl p-3"
+                style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 h-4 w-4"
+                />
+                <span className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {t('terms_accept_label')}{' '}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer"
+                    className="underline" style={{ color: 'var(--accent)' }}>
+                    {t('terms_link')}
+                  </a>{' '}
+                  {t('terms_and')}{' '}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                    className="underline" style={{ color: 'var(--accent)' }}>
+                    {t('privacy_link')}
+                  </a>
+                </span>
+              </label>
             </div>
           )}
 
@@ -383,7 +406,7 @@ export default function Onboarding() {
               {step === 4 && (
                 <button
                   onClick={() => { finish() }}
-                  disabled={saving}
+                  disabled={saving || !termsAccepted}
                   className="w-full rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-60"
                   style={{ backgroundColor: 'var(--accent)' }}>
                   {saving ? 'Создаём компанию...' : t('onboarding_enter')}
