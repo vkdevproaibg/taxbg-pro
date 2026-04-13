@@ -1,398 +1,182 @@
 import { useState } from 'react'
 import { useUserStore } from '../../store/userStore'
-import { runIntegrationTest, type IntegrationTestResult, type TestScenario } from './integrationTest'
+import {
+  runFullAudit,
+  type FullAuditResult,
+  type TestScenario,
+  type AccountingDiagnosticsResult,
+  type IntegrationTestResult,
+} from './integrationTest'
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 
-const T = {
+const MONTHS = [
+  '2026-01','2026-02','2026-03','2026-04','2026-05','2026-06',
+  '2026-07','2026-08','2026-09','2026-10','2026-11','2026-12',
+]
+
+const MONTH_NAMES: Record<string, Record<string, string>> = {
+  ru: { '01':'Январь','02':'Февраль','03':'Март','04':'Апрель','05':'Май','06':'Июнь',
+        '07':'Июль','08':'Август','09':'Сентябрь','10':'Октябрь','11':'Ноябрь','12':'Декабрь' },
+  en: { '01':'January','02':'February','03':'March','04':'April','05':'May','06':'June',
+        '07':'July','08':'August','09':'September','10':'October','11':'November','12':'December' },
+  bg: { '01':'Януари','02':'Февруари','03':'Март','04':'Април','05':'Май','06':'Юни',
+        '07':'Юли','08':'Август','09':'Септември','10':'Октомври','11':'Ноември','12':'Декември' },
+  uk: { '01':'Січень','02':'Лютий','03':'Березень','04':'Квітень','05':'Травень','06':'Червень',
+        '07':'Липень','08':'Серпень','09':'Вересень','10':'Жовтень','11':'Листопад','12':'Грудень' },
+}
+
+type PeriodType = 'month' | 'quarter' | 'year'
+
+function periodToDates(type: PeriodType, value: string): { from: string; to: string; label: string; fileTag: string } {
+  if (type === 'month') {
+    const m = value // e.g. '2026-03'
+    const y = parseInt(m.slice(0, 4))
+    const mi = parseInt(m.slice(5, 7))
+    const lastDay = new Date(y, mi, 0).getDate()
+    return { from: `${m}-01`, to: `${m}-${String(lastDay).padStart(2, '0')}`, label: m, fileTag: m.replace('-', '_') }
+  }
+  if (type === 'quarter') {
+    const [, qi] = value.split('-Q') // e.g. '2026-Q2'
+    const q = parseInt(qi)
+    const startMonth = String((q - 1) * 3 + 1).padStart(2, '0')
+    const endMonth = String(q * 3).padStart(2, '0')
+    const y = parseInt(value.slice(0, 4))
+    const lastDay = new Date(y, q * 3, 0).getDate()
+    return { from: `${y}-${startMonth}-01`, to: `${y}-${endMonth}-${lastDay}`, label: value, fileTag: `${y}_Q${q}` }
+  }
+  // year
+  return { from: `${value}-01-01`, to: `${value}-12-31`, label: value, fileTag: value }
+}
+
+const T: Record<string, Record<string, string>> = {
   ru: {
-    title: 'Интеграционный тест',
-    subtitle: 'Полная проверка: проводки, ОПР, баланс, ДДС, осигуровки, документы',
-    selectScenario: 'Выберите сценарий',
-    scenarios: {
-      small_it_company:       'Малая IT компания (ООД, ДДС, 2 сотрудника)',
-      freelancer:             'Самоосигуряващ се (без ДДС, без сотрудников)',
-      company_with_employees: 'Компания с 5 сотрудниками (1 уволен)',
-    },
-    runTest: 'Запустить тест',
-    running: 'Выполняется...',
-    // sections
-    secInput:       'Входные данные',
-    secJournal:     'Проводки',
-    secOPR:         'ОПР (Отчёт о прибылях и убытках)',
-    secBalance:     'Баланс',
-    secVAT:         'ДДС',
-    secPayroll:     'Осигуровки',
-    secDocuments:   'Документы',
-    secChecks:      'Проверки',
-    // company
-    company:        'Компания',
-    eik:            'ЕИК',
-    legalForm:      'Правна форма',
-    // tx summary
-    transactions:   'Транзакции',
-    period:         'Период',
-    total:          'Всего',
-    avgPerDay:      'Сред. в день',
-    type:           'Тип',
-    count:          'Кол-во',
-    totalAmount:    'Сумма €',
-    month:          'Месяц',
-    income:         'Приход',
-    expense:        'Расход',
-    operations:     'Операций',
-    // employees
-    employees:      'Сотрудники',
-    totalEmp:       'Всего',
-    totalGross:     'Суммарный брутто €',
-    avgSalary:      'Средняя зарплата €',
-    // journal
-    totalEntries:   'Всего записей',
-    account:        'Счёт',
-    debit:          'Дебит',
-    credit:         'Кредит',
-    balance:        'Сальдо',
-    problems:       'Проблемы',
-    noProblems:     'Нет проблем',
-    // opr
-    totalRevenue:   'Итого доходы',
-    totalExpenses:  'Итого расходы',
-    financialResult:'Финансовый результат',
-    nonDeductible:  'Непризнаваемые расходы',
-    taxableProfit:  'Налоговая прибыль',
-    corporateTax:   'Корпоративный налог (10%)',
-    netProfit:      'Чистая прибыль',
-    // balance
-    totalAssets:    'Итого активы',
-    totalPassive:   'Итого пассивы',
-    balanced:       'БАЛАНС СХОДИТСЯ',
-    notBalanced:    'БАЛАНС НЕ СХОДИТСЯ',
-    difference:     'Разница',
-    bankBalance:    'Банк (сч.503)',
-    fixedAssets:    'Основные средства',
-    debtors:        'Дебиторы (сч.411)',
-    capital:        'Капитал (сч.102)',
-    retainedEarnings:'Нераспред. прибыль (сч.122)',
-    currentProfit:  'Текущая прибыль',
-    creditors:      'Кредиторы (сч.401)',
-    vatPayable:     'ДДС за внасяне (сч.451)',
-    salaryPayable:  'Задълж. персонал (сч.421)',
-    taxPayable:     'Данъчни задълж. (сч.453)',
-    // vat
-    vatCollected:   'Начислен ДДС',
-    vatDeductible:  'Данъчен кредит',
-    vatDue:         'За внасяне',
-    // payroll
-    gross:          'Брутто',
-    erContrib:      'Работодател',
-    eeContrib:      'Работник',
-    incomeTax:      'ДДФЛ',
-    net:            'Нетто',
-    totalCost:      'Общ разход',
-    annualTotal:    'Годишен итог',
-    // documents
-    docType:        'Документ',
-    docPeriod:      'Период',
-    docStatus:      'Статус',
-    docSize:        'Размер',
-    // checks
-    checkId:        'ID',
-    checkName:      'Проверка',
-    expected:       'Ожидаемо',
-    actual:         'Фактично',
-    details:        'Детали',
-    // result
-    overallPass:    'PASS — ВСЕ ПРОВЕРКИ ПРОШЛИ',
-    overallFail:    'FAIL — ЕСТЬ ОШИБКИ',
-    checksOf:       'из',
-    passed:         'пройдено',
-    // export
-    downloadJson:   'Скачать отчёт (JSON)',
-    downloadCsv:    'Скачать проверки (CSV)',
-    durationMs:     'Время выполнения',
-    ms:             'мс',
+    scenario: 'Сценарий', period: 'Период', month: 'Месяц', quarter: 'Квартал', year: 'Год',
+    run: 'Запустить полную проверку', running: 'Выполняется...',
+    allPassed: 'ВСЕ ПРОВЕРКИ ПРОШЛИ', hasErrors: 'ЕСТЬ ОШИБКИ',
+    of: 'из', passed: 'пройдено', skipped: 'пропущено', ms: 'мс',
+    checkFor: 'Проверка за',
+    sysBalance: 'Системный баланс', manBalance: 'Ручной баланс (контроль)',
+    converges: 'СХОДИТСЯ',
+    secTx: 'Транзакции', secTrialBal: 'Оборотная ведомост', secOPR: 'ОПР', secBalance: 'Баланс: ручной vs системный',
+    secChecks: 'Проверки', secErrors: 'Ошибки', secBalanceDiff: 'Расхождения баланса',
+    company: 'Компания', eik: 'ЕИК', totalTx: 'Всего транзакций', periodLabel: 'Период',
+    type: 'Тип', count: 'Кол-во', amount: 'Сумма',
+    mismatchCount: 'транзакции с несоответствием суммы проводки',
+    trialIdentity: 'Контролно тождество', debit: 'Дебит', credit: 'Кредит',
+    account: 'Сметка', name: 'Наименование', accType: 'Тип', turnDt: 'Оборот Дт', turnCt: 'Оборот Кт',
+    balance: 'Салдо', side: 'Страна', total: 'ИТОГО',
+    totalRevenue: 'Итого доходы', totalExpenses: 'Итого расходы', financialResult: 'Финансовый результат',
+    nonDeductible: 'Непризнаваемые расходы', taxableProfit: 'Налоговая прибыль',
+    corpTax: 'Корпоративный данък', netProfit: 'Чистая прибыль',
+    assets: 'АКТИВИ', liabilities: 'ПАСИВИ', totalLabel: 'ОБЩО',
+    manualNetProfit: 'Чистая прибыль',
+    indicator: 'Показател', manual: 'Ръчно', system: 'Системно', diff: 'Разлика',
+    id: 'ID', check: 'Проверка', status: 'Статус', expected: 'Ожидаемо', actual: 'Фактично', details: 'Детали',
+    reason: 'Причина',
+    diffCount: 'расхождений между ручным и системным балансом',
+    dlFull: 'Скачать полный отчёт (JSON)', dlTrialBal: 'Скачать оборотную ведомость (CSV)',
+    dlComparison: 'Скачать сравнение баланса (CSV)', dlChecks: 'Скачать все проверки (CSV)',
+    sc_small: 'Малая IT компания (ООД, ДДС, 2 сотрудника)',
+    sc_free: 'Самоосигуряващ се (без ДДС, без сотрудников)',
+    sc_empl: 'Компания с 5 сотрудниками (1 уволен)',
+    violated: 'НАРУШЕНО',
   },
   en: {
-    title: 'Integration Test',
-    subtitle: 'Full validation: journal entries, P&L, balance sheet, VAT, payroll, documents',
-    selectScenario: 'Select scenario',
-    scenarios: {
-      small_it_company:       'Small IT company (OOD, VAT, 2 employees)',
-      freelancer:             'Freelancer / self-employed (no VAT)',
-      company_with_employees: 'Company with 5 employees (1 terminated)',
-    },
-    runTest: 'Run Test',
-    running: 'Running...',
-    secInput:       'Input data',
-    secJournal:     'Journal entries',
-    secOPR:         'P&L Statement',
-    secBalance:     'Balance Sheet',
-    secVAT:         'VAT',
-    secPayroll:     'Payroll',
-    secDocuments:   'Documents',
-    secChecks:      'Checks',
-    company:        'Company',
-    eik:            'EIK',
-    legalForm:      'Legal form',
-    transactions:   'Transactions',
-    period:         'Period',
-    total:          'Total',
-    avgPerDay:      'Avg / day',
-    type:           'Type',
-    count:          'Count',
-    totalAmount:    'Amount €',
-    month:          'Month',
-    income:         'Income',
-    expense:        'Expense',
-    operations:     'Operations',
-    employees:      'Employees',
-    totalEmp:       'Total',
-    totalGross:     'Total gross €',
-    avgSalary:      'Avg salary €',
-    totalEntries:   'Total entries',
-    account:        'Account',
-    debit:          'Debit',
-    credit:         'Credit',
-    balance:        'Balance',
-    problems:       'Problems',
-    noProblems:     'No problems',
-    totalRevenue:   'Total revenue',
-    totalExpenses:  'Total expenses',
-    financialResult:'Financial result',
-    nonDeductible:  'Non-deductible expenses',
-    taxableProfit:  'Taxable profit',
-    corporateTax:   'Corporate tax (10%)',
-    netProfit:      'Net profit',
-    totalAssets:    'Total assets',
-    totalPassive:   'Total liabilities + equity',
-    balanced:       'BALANCE CHECKS OUT',
-    notBalanced:    'BALANCE DOES NOT CHECK OUT',
-    difference:     'Difference',
-    bankBalance:    'Bank (acc.503)',
-    fixedAssets:    'Fixed assets',
-    debtors:        'Debtors (acc.411)',
-    capital:        'Capital (acc.102)',
-    retainedEarnings:'Retained earnings (acc.122)',
-    currentProfit:  'Current profit',
-    creditors:      'Creditors (acc.401)',
-    vatPayable:     'VAT payable (acc.451)',
-    salaryPayable:  'Salary payable (acc.421)',
-    taxPayable:     'Tax payable (acc.453)',
-    vatCollected:   'VAT collected',
-    vatDeductible:  'VAT credit',
-    vatDue:         'VAT due',
-    gross:          'Gross',
-    erContrib:      'Employer',
-    eeContrib:      'Employee',
-    incomeTax:      'Income tax',
-    net:            'Net',
-    totalCost:      'Total cost',
-    annualTotal:    'Annual total',
-    docType:        'Document',
-    docPeriod:      'Period',
-    docStatus:      'Status',
-    docSize:        'Size',
-    checkId:        'ID',
-    checkName:      'Check',
-    expected:       'Expected',
-    actual:         'Actual',
-    details:        'Details',
-    overallPass:    'PASS — ALL CHECKS PASSED',
-    overallFail:    'FAIL — ERRORS FOUND',
-    checksOf:       'of',
-    passed:         'passed',
-    downloadJson:   'Download report (JSON)',
-    downloadCsv:    'Download checks (CSV)',
-    durationMs:     'Duration',
-    ms:             'ms',
+    scenario: 'Scenario', period: 'Period', month: 'Month', quarter: 'Quarter', year: 'Year',
+    run: 'Run full audit', running: 'Running...',
+    allPassed: 'ALL CHECKS PASSED', hasErrors: 'ERRORS FOUND',
+    of: 'of', passed: 'passed', skipped: 'skipped', ms: 'ms',
+    checkFor: 'Audit for',
+    sysBalance: 'System balance', manBalance: 'Manual balance (control)',
+    converges: 'BALANCED',
+    secTx: 'Transactions', secTrialBal: 'Trial balance', secOPR: 'P&L', secBalance: 'Balance: manual vs system',
+    secChecks: 'Checks', secErrors: 'Errors', secBalanceDiff: 'Balance discrepancies',
+    company: 'Company', eik: 'EIK', totalTx: 'Total transactions', periodLabel: 'Period',
+    type: 'Type', count: 'Count', amount: 'Amount',
+    mismatchCount: 'transactions with journal amount mismatch',
+    trialIdentity: 'Control identity', debit: 'Debit', credit: 'Credit',
+    account: 'Account', name: 'Name', accType: 'Type', turnDt: 'Debit turnover', turnCt: 'Credit turnover',
+    balance: 'Balance', side: 'Side', total: 'TOTAL',
+    totalRevenue: 'Total revenue', totalExpenses: 'Total expenses', financialResult: 'Financial result',
+    nonDeductible: 'Non-deductible', taxableProfit: 'Taxable profit',
+    corpTax: 'Corporate tax', netProfit: 'Net profit',
+    assets: 'ASSETS', liabilities: 'LIABILITIES', totalLabel: 'TOTAL',
+    manualNetProfit: 'Net profit',
+    indicator: 'Indicator', manual: 'Manual', system: 'System', diff: 'Difference',
+    id: 'ID', check: 'Check', status: 'Status', expected: 'Expected', actual: 'Actual', details: 'Details',
+    reason: 'Reason',
+    diffCount: 'discrepancies between manual and system balance',
+    dlFull: 'Download full report (JSON)', dlTrialBal: 'Download trial balance (CSV)',
+    dlComparison: 'Download balance comparison (CSV)', dlChecks: 'Download all checks (CSV)',
+    sc_small: 'Small IT company (OOD, VAT, 2 employees)',
+    sc_free: 'Freelancer (no VAT, no employees)',
+    sc_empl: 'Company with 5 employees (1 terminated)',
+    violated: 'VIOLATED',
   },
   bg: {
-    title: 'Интеграционен тест',
-    subtitle: 'Пълна проверка: проводки, ОПР, баланс, ДДС, осигуровки, документи',
-    selectScenario: 'Изберете сценарий',
-    scenarios: {
-      small_it_company:       'Малка IT компания (ООД, ДДС, 2 служители)',
-      freelancer:             'Самоосигуряващ се (без ДДС, без служители)',
-      company_with_employees: 'Компания с 5 служители (1 напуснал)',
-    },
-    runTest: 'Стартирай тест',
-    running: 'Изпълнява се...',
-    secInput:       'Входни данни',
-    secJournal:     'Проводки',
-    secOPR:         'ОПР',
-    secBalance:     'Баланс',
-    secVAT:         'ДДС',
-    secPayroll:     'Осигуровки',
-    secDocuments:   'Документи',
-    secChecks:      'Проверки',
-    company:        'Компания',
-    eik:            'ЕИК',
-    legalForm:      'Правна форма',
-    transactions:   'Транзакции',
-    period:         'Период',
-    total:          'Общо',
-    avgPerDay:      'Средно/ден',
-    type:           'Тип',
-    count:          'Брой',
-    totalAmount:    'Сума €',
-    month:          'Месец',
-    income:         'Приход',
-    expense:        'Разход',
-    operations:     'Операции',
-    employees:      'Служители',
-    totalEmp:       'Общо',
-    totalGross:     'Общо бруто €',
-    avgSalary:      'Средна заплата €',
-    totalEntries:   'Общо записи',
-    account:        'Сметка',
-    debit:          'Дебит',
-    credit:         'Кредит',
-    balance:        'Салдо',
-    problems:       'Проблеми',
-    noProblems:     'Няма проблеми',
-    totalRevenue:   'Общо приходи',
-    totalExpenses:  'Общо разходи',
-    financialResult:'Финансов резултат',
-    nonDeductible:  'Непризнати разходи',
-    taxableProfit:  'Данъчна печалба',
-    corporateTax:   'Корпоративен данък (10%)',
-    netProfit:      'Чиста печалба',
-    totalAssets:    'Общо активи',
-    totalPassive:   'Общо пасиви',
-    balanced:       'БАЛАНСЪТ Е ВЕРЕН',
-    notBalanced:    'БАЛАНСЪТ НЕ Е ВЕРЕН',
-    difference:     'Разлика',
-    bankBalance:    'Банка (сч.503)',
-    fixedAssets:    'Дълготрайни активи',
-    debtors:        'Вземания (сч.411)',
-    capital:        'Капитал (сч.102)',
-    retainedEarnings:'Неразпред. печалба (сч.122)',
-    currentProfit:  'Текуща печалба',
-    creditors:      'Задълж. доставчици (сч.401)',
-    vatPayable:     'ДДС за внасяне (сч.451)',
-    salaryPayable:  'Задълж. персонал (сч.421)',
-    taxPayable:     'Данъчни задълж. (сч.453)',
-    vatCollected:   'Начислен ДДС',
-    vatDeductible:  'Данъчен кредит',
-    vatDue:         'За внасяне',
-    gross:          'Бруто',
-    erContrib:      'Работодател',
-    eeContrib:      'Работник',
-    incomeTax:      'ДДФЛ',
-    net:            'Нетто',
-    totalCost:      'Общ разход',
-    annualTotal:    'Годишен итог',
-    docType:        'Документ',
-    docPeriod:      'Период',
-    docStatus:      'Статус',
-    docSize:        'Размер',
-    checkId:        'ID',
-    checkName:      'Проверка',
-    expected:       'Очаквано',
-    actual:         'Фактично',
-    details:        'Детайли',
-    overallPass:    'PASS — ВСИЧКИ ПРОВЕРКИ ПРЕМИНАХА',
-    overallFail:    'FAIL — ИМА ГРЕШКИ',
-    checksOf:       'от',
-    passed:         'преминали',
-    downloadJson:   'Изтегли отчёт (JSON)',
-    downloadCsv:    'Изтегли проверки (CSV)',
-    durationMs:     'Продължителност',
-    ms:             'мс',
+    scenario: 'Сценарий', period: 'Период', month: 'Месец', quarter: 'Тримесечие', year: 'Година',
+    run: 'Стартирай пълна проверка', running: 'Изпълнява се...',
+    allPassed: 'ВСИЧКИ ПРОВЕРКИ ПРЕМИНАХА', hasErrors: 'ИМА ГРЕШКИ',
+    of: 'от', passed: 'преминали', skipped: 'пропуснати', ms: 'мс',
+    checkFor: 'Проверка за',
+    sysBalance: 'Системен баланс', manBalance: 'Ръчен баланс (контрол)',
+    converges: 'СХОДИТСЯ',
+    secTx: 'Транзакции', secTrialBal: 'Оборотна ведомост', secOPR: 'ОПР', secBalance: 'Баланс: ръчен vs системен',
+    secChecks: 'Проверки', secErrors: 'Грешки', secBalanceDiff: 'Разминавания в баланса',
+    company: 'Компания', eik: 'ЕИК', totalTx: 'Общо транзакции', periodLabel: 'Период',
+    type: 'Тип', count: 'Брой', amount: 'Сума',
+    mismatchCount: 'транзакции с несъответствие на сумата',
+    trialIdentity: 'Контролно тождество', debit: 'Дебит', credit: 'Кредит',
+    account: 'Сметка', name: 'Наименование', accType: 'Тип', turnDt: 'Оборот Дт', turnCt: 'Оборот Кт',
+    balance: 'Салдо', side: 'Страна', total: 'ИТОГО',
+    totalRevenue: 'Общо приходи', totalExpenses: 'Общо разходи', financialResult: 'Финансов резултат',
+    nonDeductible: 'Непризнати разходи', taxableProfit: 'Данъчна печалба',
+    corpTax: 'Корпоративен данък', netProfit: 'Чиста печалба',
+    assets: 'АКТИВИ', liabilities: 'ПАСИВИ', totalLabel: 'ОБЩО',
+    manualNetProfit: 'Чиста печалба',
+    indicator: 'Показател', manual: 'Ръчно', system: 'Системно', diff: 'Разлика',
+    id: 'ID', check: 'Проверка', status: 'Статус', expected: 'Очаквано', actual: 'Фактично', details: 'Детайли',
+    reason: 'Причина',
+    diffCount: 'разминавания между ръчен и системен баланс',
+    dlFull: 'Изтегли пълен отчет (JSON)', dlTrialBal: 'Изтегли оборотна ведомост (CSV)',
+    dlComparison: 'Изтегли сравнение баланс (CSV)', dlChecks: 'Изтегли всички проверки (CSV)',
+    sc_small: 'Малка IT компания (ООД, ДДС, 2 служители)',
+    sc_free: 'Самоосигуряващ се (без ДДС)',
+    sc_empl: 'Компания с 5 служители (1 напуснал)',
+    violated: 'НАРУШЕНО',
   },
   uk: {
-    title: 'Інтеграційний тест',
-    subtitle: 'Повна перевірка: проведення, ОПР, баланс, ПДВ, нарахування, документи',
-    selectScenario: 'Оберіть сценарій',
-    scenarios: {
-      small_it_company:       'Мала IT компанія (ООД, ПДВ, 2 співробітники)',
-      freelancer:             'Самозайнятий (без ПДВ, без співробітників)',
-      company_with_employees: 'Компанія з 5 співробітниками (1 звільнений)',
-    },
-    runTest: 'Запустити тест',
-    running: 'Виконується...',
-    secInput:       'Вхідні дані',
-    secJournal:     'Проведення',
-    secOPR:         'ОПР',
-    secBalance:     'Баланс',
-    secVAT:         'ПДВ',
-    secPayroll:     'Нарахування',
-    secDocuments:   'Документи',
-    secChecks:      'Перевірки',
-    company:        'Компанія',
-    eik:            'ЄІК',
-    legalForm:      'Правова форма',
-    transactions:   'Транзакції',
-    period:         'Період',
-    total:          'Всього',
-    avgPerDay:      'Сер. на день',
-    type:           'Тип',
-    count:          'Кількість',
-    totalAmount:    'Сума €',
-    month:          'Місяць',
-    income:         'Дохід',
-    expense:        'Витрата',
-    operations:     'Операцій',
-    employees:      'Співробітники',
-    totalEmp:       'Всього',
-    totalGross:     'Загальний брутто €',
-    avgSalary:      'Середня зарплата €',
-    totalEntries:   'Всього записів',
-    account:        'Рахунок',
-    debit:          'Дебет',
-    credit:         'Кредит',
-    balance:        'Залишок',
-    problems:       'Проблеми',
-    noProblems:     'Немає проблем',
-    totalRevenue:   'Разом доходи',
-    totalExpenses:  'Разом витрати',
-    financialResult:'Фінансовий результат',
-    nonDeductible:  'Невизнані витрати',
-    taxableProfit:  'Оподатковуваний прибуток',
-    corporateTax:   'Корпоративний податок (10%)',
-    netProfit:      'Чистий прибуток',
-    totalAssets:    'Разом активи',
-    totalPassive:   'Разом пасиви',
-    balanced:       'БАЛАНС ЗБІГАЄТЬСЯ',
-    notBalanced:    'БАЛАНС НЕ ЗБІГАЄТЬСЯ',
-    difference:     'Різниця',
-    bankBalance:    'Банк (рах.503)',
-    fixedAssets:    'Основні засоби',
-    debtors:        'Дебітори (рах.411)',
-    capital:        'Капітал (рах.102)',
-    retainedEarnings:'Нерозподілений прибуток (рах.122)',
-    currentProfit:  'Поточний прибуток',
-    creditors:      'Кредитори (рах.401)',
-    vatPayable:     'ПДВ до сплати (рах.451)',
-    salaryPayable:  'Заборг. персоналу (рах.421)',
-    taxPayable:     'Податкові заборг. (рах.453)',
-    vatCollected:   'ПДВ нарахований',
-    vatDeductible:  'Податковий кредит',
-    vatDue:         'До сплати',
-    gross:          'Брутто',
-    erContrib:      'Роботодавець',
-    eeContrib:      'Працівник',
-    incomeTax:      'ПДФО',
-    net:            'Нетто',
-    totalCost:      'Загальні витрати',
-    annualTotal:    'Річний підсумок',
-    docType:        'Документ',
-    docPeriod:      'Період',
-    docStatus:      'Статус',
-    docSize:        'Розмір',
-    checkId:        'ID',
-    checkName:      'Перевірка',
-    expected:       'Очікуване',
-    actual:         'Фактичне',
-    details:        'Деталі',
-    overallPass:    'PASS — ВСІ ПЕРЕВІРКИ ПРОЙДЕНО',
-    overallFail:    'FAIL — Є ПОМИЛКИ',
-    checksOf:       'з',
-    passed:         'пройдено',
-    downloadJson:   'Завантажити звіт (JSON)',
-    downloadCsv:    'Завантажити перевірки (CSV)',
-    durationMs:     'Тривалість',
-    ms:             'мс',
+    scenario: 'Сценарій', period: 'Період', month: 'Місяць', quarter: 'Квартал', year: 'Рік',
+    run: 'Запустити повну перевірку', running: 'Виконується...',
+    allPassed: 'ВСІ ПЕРЕВІРКИ ПРОЙДЕНО', hasErrors: 'Є ПОМИЛКИ',
+    of: 'з', passed: 'пройдено', skipped: 'пропущено', ms: 'мс',
+    checkFor: 'Перевірка за',
+    sysBalance: 'Системний баланс', manBalance: 'Ручний баланс (контроль)',
+    converges: 'ЗБІГАЄТЬСЯ',
+    secTx: 'Транзакції', secTrialBal: 'Оборотна відомість', secOPR: 'ОПР', secBalance: 'Баланс: ручний vs системний',
+    secChecks: 'Перевірки', secErrors: 'Помилки', secBalanceDiff: 'Розбіжності балансу',
+    company: 'Компанія', eik: 'ЄІК', totalTx: 'Всього транзакцій', periodLabel: 'Період',
+    type: 'Тип', count: 'Кількість', amount: 'Сума',
+    mismatchCount: 'транзакції з невідповідністю суми',
+    trialIdentity: 'Контрольна тотожність', debit: 'Дебет', credit: 'Кредит',
+    account: 'Рахунок', name: 'Назва', accType: 'Тип', turnDt: 'Оборот Дт', turnCt: 'Оборот Кт',
+    balance: 'Залишок', side: 'Сторона', total: 'ВСЬОГО',
+    totalRevenue: 'Разом доходи', totalExpenses: 'Разом витрати', financialResult: 'Фінансовий результат',
+    nonDeductible: 'Невизнані витрати', taxableProfit: 'Оподаткований прибуток',
+    corpTax: 'Корпоративний податок', netProfit: 'Чистий прибуток',
+    assets: 'АКТИВИ', liabilities: 'ПАСИВИ', totalLabel: 'ВСЬОГО',
+    manualNetProfit: 'Чистий прибуток',
+    indicator: 'Показник', manual: 'Ручний', system: 'Системний', diff: 'Різниця',
+    id: 'ID', check: 'Перевірка', status: 'Статус', expected: 'Очікуване', actual: 'Фактичне', details: 'Деталі',
+    reason: 'Причина',
+    diffCount: 'розбіжностей між ручним і системним балансом',
+    dlFull: 'Завантажити повний звіт (JSON)', dlTrialBal: 'Завантажити оборотну відомість (CSV)',
+    dlComparison: 'Завантажити порівняння балансу (CSV)', dlChecks: 'Завантажити всі перевірки (CSV)',
+    sc_small: 'Мала IT компанія (ООД, ПДВ, 2 співробітники)',
+    sc_free: 'Самозайнятий (без ПДВ)',
+    sc_empl: 'Компанія з 5 співробітниками (1 звільнений)',
+    violated: 'ПОРУШЕНО',
   },
 }
 
@@ -436,93 +220,75 @@ function Td({ children, mono = false, right = false }: { children: React.ReactNo
   )
 }
 
-// ─── Download helpers ──────────────────────────────────────────────────────────
-
-function downloadJson(result: IntegrationTestResult) {
-  const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `integration_test_${result.company.eik}_${result.generatedAt.slice(0, 10)}.json`
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function downloadChecksCsv(result: IntegrationTestResult, labels: typeof T['ru']) {
-  const q = (v: string) => `"${v.replace(/"/g, '""')}"`
-  const header = [labels.checkId, labels.checkName, labels.docStatus, labels.expected, labels.actual, labels.details]
-    .map(q).join(';')
-  const rows = result.checks.map(c => [
-    c.id,
-    c.name,
-    c.skipped ? 'SKIP' : c.passed ? 'PASS' : 'FAIL',
-    c.expected,
-    c.actual,
-    c.details ?? '',
-  ].map(v => q(String(v))).join(';'))
-  const csv = [header, ...rows].join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `checks_${result.company.eik}_${result.generatedAt.slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export default function IntegrationTestRunner() {
-  const language = useUserStore(s => s.language)
+export default function FullAuditReport() {
+  const language = useUserStore(s => s.language) || 'ru'
   const L = T[language] ?? T.ru
+  const monthNames = MONTH_NAMES[language] ?? MONTH_NAMES.ru
 
   const [scenario, setScenario] = useState<TestScenario>('small_it_company')
-  const [running, setRunning]   = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [result, setResult]     = useState<IntegrationTestResult | null>(null)
+  const [periodType, setPeriodType] = useState<PeriodType>('year')
+  const [monthVal, setMonthVal]     = useState('2026-03')
+  const [quarterVal, setQuarterVal] = useState('2026-Q1')
+  const [yearVal]                   = useState('2026')
+  const [running, setRunning]       = useState(false)
+  const [progress, setProgress]     = useState(0)
+  const [result, setResult]         = useState<FullAuditResult | null>(null)
+
+  const scenarioLabels: Record<TestScenario, string> = {
+    small_it_company: L.sc_small, freelancer: L.sc_free, company_with_employees: L.sc_empl,
+  }
+
+  function getMonthLabel(m: string) {
+    return `${monthNames[m.slice(5, 7)] ?? m.slice(5, 7)} ${m.slice(0, 4)}`
+  }
 
   const handleRun = async () => {
     setRunning(true)
     setResult(null)
     setProgress(0)
 
-    // Simulate progress ticks while running (test is sync but shows feedback)
-    const timer = setInterval(() => setProgress(p => Math.min(p + 12, 90)), 150)
+    const selVal = periodType === 'month' ? monthVal : periodType === 'quarter' ? quarterVal : yearVal
+    const { from, to, label, fileTag } = periodToDates(periodType, selVal)
+
+    const displayLabel = periodType === 'month' ? getMonthLabel(monthVal)
+      : periodType === 'quarter' ? quarterVal.replace('-', ' ')
+      : yearVal
+
+    const timer = setInterval(() => setProgress(p => Math.min(p + 8, 90)), 150)
 
     try {
-      // yield to event loop so UI updates
       await new Promise(r => setTimeout(r, 10))
-      const res = await runIntegrationTest(scenario)
+      const res = await runFullAudit(scenario, from, to, displayLabel)
       clearInterval(timer)
       setProgress(100)
       setResult(res)
     } catch (e) {
       clearInterval(timer)
-      console.error('[integrationTest] failed:', e)
+      console.error('[fullAudit] failed:', e)
     } finally {
       setRunning(false)
     }
   }
 
+  const itg = result?.integration
+  const diag = result?.diagnostics
+
+  const radioStyle = (active: boolean) => ({
+    backgroundColor: active ? 'var(--accent)' : 'var(--surface)',
+    color: active ? 'white' : 'var(--text-secondary)',
+    borderColor: active ? 'var(--accent)' : 'var(--border)',
+  })
+
   return (
     <div className="p-6 max-w-5xl space-y-4">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {L.title}
-        </h1>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-          {L.subtitle}
-        </p>
-      </div>
-
-      {/* Controls */}
+      {/* ── Controls ────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end gap-3">
+        {/* Scenario */}
         <div>
-          <label className="block text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
-            {L.selectScenario}
-          </label>
+          <label className="block text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{L.scenario}</label>
           <select
             value={scenario}
             onChange={e => setScenario(e.target.value as TestScenario)}
@@ -531,398 +297,431 @@ export default function IntegrationTestRunner() {
             style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-primary)' }}
           >
             {(['small_it_company', 'freelancer', 'company_with_employees'] as TestScenario[]).map(s => (
-              <option key={s} value={s}>{L.scenarios[s]}</option>
+              <option key={s} value={s}>{scenarioLabels[s]}</option>
             ))}
           </select>
         </div>
+
+        {/* Period type radio */}
+        <div>
+          <label className="block text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{L.period}</label>
+          <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+            {(['month', 'quarter', 'year'] as PeriodType[]).map(pt => (
+              <button
+                key={pt}
+                onClick={() => setPeriodType(pt)}
+                disabled={running}
+                className="px-3 py-2 text-xs font-medium border-r last:border-r-0 transition-colors"
+                style={radioStyle(periodType === pt)}
+              >
+                {L[pt]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Period value dropdown */}
+        {periodType === 'month' && (
+          <div>
+            <label className="block text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{L.month}</label>
+            <select
+              value={monthVal}
+              onChange={e => setMonthVal(e.target.value)}
+              disabled={running}
+              className="rounded-lg border px-3 py-2 text-sm focus:outline-none"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-primary)' }}
+            >
+              {MONTHS.map(m => (
+                <option key={m} value={m}>{getMonthLabel(m)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {periodType === 'quarter' && (
+          <div>
+            <label className="block text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{L.quarter}</label>
+            <select
+              value={quarterVal}
+              onChange={e => setQuarterVal(e.target.value)}
+              disabled={running}
+              className="rounded-lg border px-3 py-2 text-sm focus:outline-none"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-primary)' }}
+            >
+              {['2026-Q1','2026-Q2','2026-Q3','2026-Q4'].map(q => (
+                <option key={q} value={q}>{q.replace('-', ' ')}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {periodType === 'year' && (
+          <div>
+            <label className="block text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{L.year}</label>
+            <select disabled={running}
+              className="rounded-lg border px-3 py-2 text-sm focus:outline-none"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)', color: 'var(--text-primary)' }}
+            >
+              <option>2026</option>
+            </select>
+          </div>
+        )}
+
+        {/* Run button */}
         <button
           onClick={handleRun}
           disabled={running}
           className="rounded-lg px-5 py-2 text-sm font-medium disabled:opacity-50"
           style={{ backgroundColor: 'var(--accent)', color: 'white' }}
         >
-          {running ? L.running : L.runTest}
+          {running ? L.running : L.run}
         </button>
       </div>
 
-      {/* Progress bar */}
+      {/* Progress */}
       {(running || (result && progress === 100)) && (
         <div className="w-full rounded-full h-1.5 overflow-hidden"
           style={{ backgroundColor: 'var(--border)' }}>
-          <div
-            className="h-full rounded-full transition-all duration-150"
-            style={{ width: `${progress}%`, backgroundColor: 'var(--accent)' }}
-          />
+          <div className="h-full rounded-full transition-all duration-150"
+            style={{ width: `${progress}%`, backgroundColor: 'var(--accent)' }} />
         </div>
       )}
 
-      {/* Results */}
-      {result && (
+      {/* ═══════════ REPORT ═══════════ */}
+      {itg && diag && result && (
         <div className="space-y-2">
 
-          {/* ── Overall ─────────────────────────────────── */}
+          {/* ── 1. СВОДКА ──────────────────────────────────── */}
           <div
             className="rounded-xl p-5 text-center"
             style={{
-              backgroundColor: result.overallStatus === 'PASS' ? '#dcfce7' : '#fef2f2',
-              border: `2px solid ${result.overallStatus === 'PASS' ? '#16a34a' : '#dc2626'}`,
+              backgroundColor: itg.overallStatus === 'PASS' ? '#dcfce7' : '#fef2f2',
+              border: `2px solid ${itg.overallStatus === 'PASS' ? '#16a34a' : '#dc2626'}`,
             }}
           >
             <p className="text-2xl font-bold"
-              style={{ color: result.overallStatus === 'PASS' ? '#15803d' : '#dc2626' }}>
-              {result.overallStatus === 'PASS' ? L.overallPass : L.overallFail}
+              style={{ color: itg.overallStatus === 'PASS' ? '#15803d' : '#dc2626' }}>
+              {itg.overallStatus === 'PASS' ? L.allPassed : L.hasErrors}
             </p>
-            <p className="text-sm mt-1" style={{ color: result.overallStatus === 'PASS' ? '#166534' : '#b91c1c' }}>
-              {result.passedChecks} {L.checksOf} {result.totalChecks} {L.passed}
-              {result.skippedChecks > 0 && ` · ⏭ ${result.skippedChecks} SKIP`}
-              {' · '}{L.durationMs}: {result.durationMs} {L.ms}
+            <p className="text-sm mt-1" style={{ color: itg.overallStatus === 'PASS' ? '#166534' : '#b91c1c' }}>
+              {itg.passedChecks} {L.of} {itg.totalChecks} {L.passed}
+              {itg.skippedChecks > 0 && ` · ${itg.skippedChecks} ${L.skipped}`}
+              {' · '}{result.durationMs} {L.ms}
+            </p>
+            <p className="text-xs mt-1" style={{ color: itg.overallStatus === 'PASS' ? '#166534' : '#b91c1c' }}>
+              {L.checkFor} {result.periodLabel} ({L.scenario}: {scenarioLabels[scenario]})
             </p>
           </div>
 
-          {/* ── Input data ──────────────────────────────── */}
-          <SectionTitle title={L.secInput} />
+          {/* Balance quick status */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg p-3 text-center text-xs" style={{ border: '1px solid var(--border)' }}>
+              <div style={{ color: 'var(--text-muted)' }}>{L.sysBalance}</div>
+              <div className="text-lg font-bold font-mono" style={{ color: diag.systemBalance.isBalanced ? '#15803d' : '#dc2626' }}>
+                {diag.systemBalance.isBalanced ? L.converges : `${diag.systemBalance.difference.toFixed(4)}`}
+              </div>
+              <div className="font-mono mt-1">
+                A: {diag.systemBalance.totalAssets.toFixed(2)} | P: {diag.systemBalance.totalPassive.toFixed(2)}
+              </div>
+            </div>
+            <div className="rounded-lg p-3 text-center text-xs" style={{ border: '1px solid var(--border)' }}>
+              <div style={{ color: 'var(--text-muted)' }}>{L.manBalance}</div>
+              <div className="text-lg font-bold font-mono" style={{ color: Math.abs(diag.manualBalance.difference) < 0.01 ? '#15803d' : '#dc2626' }}>
+                {Math.abs(diag.manualBalance.difference) < 0.01 ? L.converges : `${diag.manualBalance.difference.toFixed(4)}`}
+              </div>
+              <div className="font-mono mt-1">
+                A: {diag.manualBalance.totalAssets.toFixed(2)} | P: {diag.manualBalance.totalPassive.toFixed(2)}
+              </div>
+            </div>
+          </div>
 
-          <Row label={L.company}   value={result.company.name} />
-          <Row label={L.eik}       value={result.company.eik} />
-          <Row label={L.legalForm} value={result.company.legalForm} />
-          <Row label={`${L.transactions} — ${L.total}`} value={result.transactionsSummary.total} />
-          <Row label={L.period}
-            value={`${result.transactionsSummary.period.from} — ${result.transactionsSummary.period.to}`} />
-          <Row label={L.avgPerDay} value={result.transactionsSummary.avgPerDay} />
+          {/* ── 2. ТРАНЗАКЦИИ ──────────────────────────────── */}
+          <SectionTitle title={L.secTx} />
+          <Row label={L.company} value={itg.company.name} />
+          <Row label={L.eik} value={itg.company.eik} />
+          <Row label={L.totalTx} value={itg.transactionsSummary.total} />
+          <Row label={L.periodLabel} value={`${result.periodFrom} — ${result.periodTo}`} />
 
-          {/* By type */}
           <div className="overflow-x-auto rounded-lg border mt-2" style={{ borderColor: 'var(--border)' }}>
             <table className="w-full text-xs">
-              <thead>
-                <tr><Th>{L.type}</Th><Th>{L.count}</Th><Th>{L.totalAmount}</Th></tr>
-              </thead>
+              <thead><tr><Th>{L.type}</Th><Th>{L.count}</Th><Th>{L.amount}</Th></tr></thead>
               <tbody>
-                {Object.entries(result.transactionsSummary.byType)
+                {Object.entries(itg.transactionsSummary.byType)
                   .sort((a, b) => b[1].totalAmount - a[1].totalAmount)
                   .map(([type, v]) => (
                     <tr key={type} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                      <Td mono>{type}</Td>
-                      <Td right>{v.count}</Td>
-                      <Td right mono>{v.totalAmount.toFixed(2)}</Td>
+                      <Td mono>{type}</Td><Td right>{v.count}</Td><Td right mono>{v.totalAmount.toFixed(2)}</Td>
                     </tr>
                   ))}
               </tbody>
             </table>
           </div>
 
-          {/* By month */}
-          <div className="overflow-x-auto rounded-lg border mt-2" style={{ borderColor: 'var(--border)' }}>
+          {(() => {
+            const mismatches = diag.transactionDiags.filter(d => d.amountMismatch)
+            if (mismatches.length === 0) return null
+            return (
+              <div className="rounded-lg p-3 text-xs mt-2"
+                style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5' }}>
+                <p className="font-semibold">{mismatches.length} {L.mismatchCount}:</p>
+                {mismatches.slice(0, 5).map((d, i) => (
+                  <p key={i}>{d.type} {d.date} — {d.amount.toFixed(2)} vs {d.entries[0]?.amount.toFixed(2) ?? '?'}</p>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* ── 3. ОБОРОТНАЯ ВЕДОМОСТЬ ────────────────────── */}
+          <SectionTitle title={L.secTrialBal} />
+
+          <div className="rounded-lg p-3 text-xs mb-2"
+            style={{
+              backgroundColor: diag.trialBalanceCheck.isEqual ? '#dcfce7' : '#fef2f2',
+              color: diag.trialBalanceCheck.isEqual ? '#15803d' : '#dc2626',
+              border: `1px solid ${diag.trialBalanceCheck.isEqual ? '#86efac' : '#fca5a5'}`,
+            }}>
+            {diag.trialBalanceCheck.isEqual
+              ? `${L.trialIdentity}: ${L.debit} = ${L.credit} = ${diag.trialBalanceCheck.totalDebit.toFixed(2)}`
+              : `${L.violated}! ${L.debit}: ${diag.trialBalanceCheck.totalDebit.toFixed(2)} ≠ ${L.credit}: ${diag.trialBalanceCheck.totalCredit.toFixed(2)}`
+            }
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: 'var(--border)' }}>
             <table className="w-full text-xs">
               <thead>
                 <tr>
-                  <Th>{L.month}</Th>
-                  <Th>{L.income}</Th>
-                  <Th>{L.expense}</Th>
-                  <Th>{L.operations}</Th>
+                  <Th>{L.account}</Th><Th>{L.name}</Th><Th>{L.accType}</Th>
+                  <Th>{L.turnDt}</Th><Th>{L.turnCt}</Th><Th>{L.balance}</Th><Th>{L.side}</Th>
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(result.transactionsSummary.byMonth)
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([m, v]) => (
-                    <tr key={m} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                      <Td>{m}</Td>
-                      <Td right mono>{v.income.toFixed(2)}</Td>
-                      <Td right mono>{v.expense.toFixed(2)}</Td>
-                      <Td right>{v.count}</Td>
-                    </tr>
-                  ))}
+                {diag.trialBalance.map(r => (
+                  <tr key={r.account} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                    <Td mono>{r.account}</Td>
+                    <Td>{r.accountLabel}</Td>
+                    <Td>
+                      <span className="text-[10px] px-1 py-0.5 rounded" style={{
+                        backgroundColor: r.accountType === 'active' ? '#dbeafe' : r.accountType === 'passive' ? '#fce7f3' : r.accountType === 'active-passive' ? '#fef3c7' : r.accountType === 'expense' ? '#fee2e2' : '#dcfce7',
+                        color: r.accountType === 'active' ? '#1d4ed8' : r.accountType === 'passive' ? '#be185d' : r.accountType === 'active-passive' ? '#92400e' : r.accountType === 'expense' ? '#dc2626' : '#15803d',
+                      }}>{r.accountType}</span>
+                    </Td>
+                    <Td right mono>{r.debitTurnover.toFixed(2)}</Td>
+                    <Td right mono>{r.creditTurnover.toFixed(2)}</Td>
+                    <Td right mono><span style={{ fontWeight: 600 }}>{Math.abs(r.closingBalance).toFixed(2)}</span></Td>
+                    <Td><span style={{ color: r.balanceSide === 'debit' ? '#1d4ed8' : r.balanceSide === 'credit' ? '#be185d' : '#6b7280', fontWeight: 600 }}>
+                      {r.balanceSide === 'debit' ? 'Дт' : r.balanceSide === 'credit' ? 'Кт' : '—'}
+                    </span></Td>
+                  </tr>
+                ))}
+                <tr className="border-t font-semibold" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
+                  <Td><strong>{L.total}</strong></Td><Td>{''}</Td><Td>{''}</Td>
+                  <Td right mono>{diag.trialBalanceCheck.totalDebit.toFixed(2)}</Td>
+                  <Td right mono>{diag.trialBalanceCheck.totalCredit.toFixed(2)}</Td>
+                  <Td>{''}</Td><Td>{''}</Td>
+                </tr>
               </tbody>
             </table>
           </div>
 
-          {/* Employees */}
-          {result.employeesSummary.total > 0 && (
-            <>
-              <Row label={`${L.employees} — ${L.totalEmp}`} value={result.employeesSummary.total} />
-              <Row label={L.totalGross} value={result.employeesSummary.totalGrossSalary} />
-              <Row label={L.avgSalary}  value={parseFloat(result.employeesSummary.avgSalary.toFixed(2))} />
-            </>
-          )}
-
-          {/* ── Journal ─────────────────────────────────── */}
-          <SectionTitle title={L.secJournal} />
-
-          <Row label={L.totalEntries} value={result.journalSummary.totalEntries} />
-
-          <div className="overflow-x-auto rounded-lg border mt-2" style={{ borderColor: 'var(--border)' }}>
-            <table className="w-full text-xs">
-              <thead>
-                <tr>
-                  <Th>{L.account}</Th>
-                  <Th>{L.debit}</Th>
-                  <Th>{L.credit}</Th>
-                  <Th>{L.balance}</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(result.journalSummary.byAccount)
-                  .sort(([a], [b]) => a.localeCompare(b))
-                  .map(([acc, v]) => (
-                    <tr key={acc} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                      <Td mono>{acc}</Td>
-                      <Td right mono>{v.debitTotal.toFixed(2)}</Td>
-                      <Td right mono>{v.creditTotal.toFixed(2)}</Td>
-                      <Td right mono>
-                        <span style={{ color: v.balance >= 0 ? 'var(--text-primary)' : '#dc2626' }}>
-                          {v.balance.toFixed(2)}
-                        </span>
-                      </Td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Problems */}
-          {(result.journalSummary.missingEntries.length > 0 || result.journalSummary.orphanEntries.length > 0) && (
-            <div className="rounded-lg p-3 text-xs mt-2"
-              style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5' }}>
-              <p className="font-semibold mb-1">{L.problems}:</p>
-              {result.journalSummary.missingEntries.map((m, i) => <p key={i}>• {m}</p>)}
-              {result.journalSummary.orphanEntries.map((m, i) => <p key={i}>• {m}</p>)}
-            </div>
-          )}
-
-          {/* ── OPR ─────────────────────────────────────── */}
+          {/* ── 4. ОПР ────────────────────────────────────── */}
           <SectionTitle title={L.secOPR} />
-
-          {[
-            [L.totalRevenue,    result.oprResult.totalRevenue],
-            [L.totalExpenses,   result.oprResult.totalExpenses],
-            [L.financialResult, result.oprResult.financialResult],
-            [L.nonDeductible,   result.oprResult.nonDeductible],
-            [L.taxableProfit,   result.oprResult.taxableProfit],
-            [L.corporateTax,    result.oprResult.corporateTax],
-            [L.netProfit,       result.oprResult.netProfit],
-          ].map(([label, val]) => (
-            <Row key={String(label)} label={String(label)} value={val as number} mono />
+          {([
+            [L.totalRevenue,   itg.oprResult.totalRevenue],
+            [L.totalExpenses,  itg.oprResult.totalExpenses],
+            [L.financialResult,itg.oprResult.financialResult],
+            [L.nonDeductible,  itg.oprResult.nonDeductible],
+            [L.taxableProfit,  itg.oprResult.taxableProfit],
+            [L.corpTax,        itg.oprResult.corporateTax],
+            [L.netProfit,      itg.oprResult.netProfit],
+          ] as [string, number][]).map(([label, val]) => (
+            <Row key={label} label={label} value={val} mono />
           ))}
 
-          {/* ── Balance ─────────────────────────────────── */}
+          {/* ── 5. БАЛАНС ─────────────────────────────────── */}
           <SectionTitle title={L.secBalance} />
 
-          <div
-            className="rounded-xl p-4 text-center text-sm font-bold mb-2"
-            style={{
-              backgroundColor: result.balanceResult.isBalanced ? '#dcfce7' : '#fef2f2',
-              color: result.balanceResult.isBalanced ? '#15803d' : '#dc2626',
-              border: `2px solid ${result.balanceResult.isBalanced ? '#16a34a' : '#dc2626'}`,
-            }}
-          >
-            {result.balanceResult.isBalanced ? L.balanced : L.notBalanced}
-            {!result.balanceResult.isBalanced && (
-              <span className="ml-2 font-normal">
-                {L.difference}: {result.balanceResult.difference.toFixed(4)} €
-              </span>
-            )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
+              <h3 className="text-sm font-semibold mb-2" style={{ color: '#1d4ed8' }}>{L.assets}</h3>
+              {diag.manualBalance.assets.map((a, i) => (
+                <div key={i} className="flex justify-between text-xs py-0.5">
+                  <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{a.account}</span>
+                  <span className="font-mono" style={{ color: a.amount < 0 ? '#dc2626' : 'var(--text-primary)' }}>{a.amount.toFixed(2)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between text-xs font-bold mt-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                <span>{L.totalLabel}</span><span className="font-mono">{diag.manualBalance.totalAssets.toFixed(2)}</span>
+              </div>
+            </div>
+            <div className="rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
+              <h3 className="text-sm font-semibold mb-2" style={{ color: '#be185d' }}>{L.liabilities}</h3>
+              {diag.manualBalance.liabilities.map((l, i) => (
+                <div key={i} className="flex justify-between text-xs py-0.5">
+                  <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{l.account}</span>
+                  <span className="font-mono">{l.amount.toFixed(2)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between text-xs py-0.5" style={{ color: 'var(--text-muted)' }}>
+                <span>{L.manualNetProfit}</span><span className="font-mono">{diag.manualBalance.netProfit.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-xs font-bold mt-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                <span>{L.totalLabel}</span><span className="font-mono">{diag.manualBalance.totalPassive.toFixed(2)}</span>
+              </div>
+            </div>
           </div>
 
-          {[
-            ['— АКТИВИ —',           ''],
-            [L.bankBalance,          result.balanceResult.details.bankBalance],
-            [L.fixedAssets,          result.balanceResult.details.fixedAssets],
-            [L.debtors,              result.balanceResult.details.debtors],
-            [L.totalAssets,          result.balanceResult.totalAssets],
-            ['— ПАСИВИ —',           ''],
-            [L.capital,              result.balanceResult.details.capital],
-            [L.retainedEarnings,     result.balanceResult.details.retainedEarnings],
-            [L.currentProfit,        result.balanceResult.details.currentProfit],
-            [L.creditors,            result.balanceResult.details.creditors],
-            [L.vatPayable,           result.balanceResult.details.vatPayable],
-            [L.salaryPayable,        result.balanceResult.details.salaryPayable],
-            [L.taxPayable,           result.balanceResult.details.taxPayable],
-            [L.totalPassive,         result.balanceResult.totalPassive],
-          ].map(([label, val]) => (
-            <Row key={String(label)} label={String(label)}
-              value={val === '' ? '' : (val as number).toFixed(2)}
-              mono={val !== ''} />
-          ))}
-
-          {/* ── VAT ─────────────────────────────────────── */}
-          {Object.keys(result.vatSummary.byMonth).length > 0 && (
-            <>
-              <SectionTitle title={L.secVAT} />
-
-              <Row label={L.vatCollected}  value={result.vatSummary.totalCollected} mono />
-              <Row label={L.vatDeductible} value={result.vatSummary.totalDeductible} mono />
-              <Row label={L.vatDue}        value={result.vatSummary.vatPayable} mono />
-
-              <div className="overflow-x-auto rounded-lg border mt-2" style={{ borderColor: 'var(--border)' }}>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr>
-                      <Th>{L.month}</Th>
-                      <Th>{L.vatCollected}</Th>
-                      <Th>{L.vatDeductible}</Th>
-                      <Th>{L.vatDue}</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(result.vatSummary.byMonth)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([m, v]) => (
-                        <tr key={m} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                          <Td>{m}</Td>
-                          <Td right mono>{v.collected.toFixed(2)}</Td>
-                          <Td right mono>{v.deductible.toFixed(2)}</Td>
-                          <Td right mono>
-                            <span style={{ color: v.payable > 0 ? '#dc2626' : 'var(--text-primary)' }}>
-                              {v.payable.toFixed(2)}
-                            </span>
-                          </Td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          {/* ── Payroll ──────────────────────────────────── */}
-          {result.payrollSummary && (
-            <>
-              <SectionTitle title={L.secPayroll} />
-
-              <div className="overflow-x-auto rounded-lg border mt-2" style={{ borderColor: 'var(--border)' }}>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr>
-                      <Th>{L.month}</Th>
-                      <Th>{L.gross}</Th>
-                      <Th>{L.erContrib}</Th>
-                      <Th>{L.eeContrib}</Th>
-                      <Th>{L.incomeTax}</Th>
-                      <Th>{L.net}</Th>
-                      <Th>{L.totalCost}</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(result.payrollSummary.byMonth)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([m, v]) => (
-                        <tr key={m} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                          <Td>{m}</Td>
-                          <Td right mono>{v.totalGross.toFixed(2)}</Td>
-                          <Td right mono>{v.totalEmployerContrib.toFixed(2)}</Td>
-                          <Td right mono>{v.totalEmployeeContrib.toFixed(2)}</Td>
-                          <Td right mono>{v.totalIncomeTax.toFixed(2)}</Td>
-                          <Td right mono>{v.totalNet.toFixed(2)}</Td>
-                          <Td right mono>{v.totalCost.toFixed(2)}</Td>
-                        </tr>
-                      ))}
-                    {/* Annual total */}
-                    <tr className="border-t font-semibold"
-                      style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface)' }}>
-                      <Td><strong>{L.annualTotal}</strong></Td>
-                      <Td right mono>{result.payrollSummary.annualTotal.gross.toFixed(2)}</Td>
-                      <Td right mono>{result.payrollSummary.annualTotal.employerContrib.toFixed(2)}</Td>
-                      <Td right mono>{result.payrollSummary.annualTotal.employeeContrib.toFixed(2)}</Td>
-                      <Td right mono>{result.payrollSummary.annualTotal.incomeTax.toFixed(2)}</Td>
-                      <Td right mono>{result.payrollSummary.annualTotal.netPaid.toFixed(2)}</Td>
-                      <Td right mono>{result.payrollSummary.annualTotal.totalCost.toFixed(2)}</Td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          {/* ── Documents ────────────────────────────────── */}
-          <SectionTitle title={L.secDocuments} />
-
-          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+          <div className="overflow-x-auto rounded-lg border mt-3" style={{ borderColor: 'var(--border)' }}>
             <table className="w-full text-xs">
-              <thead>
-                <tr>
-                  <Th>{L.docType}</Th>
-                  <Th>{L.docPeriod}</Th>
-                  <Th>{L.docStatus}</Th>
-                  <Th>{L.docSize}</Th>
-                </tr>
-              </thead>
+              <thead><tr><Th>{L.indicator}</Th><Th>{L.manual}</Th><Th>{L.system}</Th><Th>{L.diff}</Th></tr></thead>
               <tbody>
-                {result.documentsGenerated.map((doc, i) => (
-                  <tr key={i} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                    <Td mono>{doc.type}</Td>
-                    <Td>{doc.period}</Td>
-                    <Td>
-                      <span style={{ color: doc.success ? '#16a34a' : '#dc2626' }}>
-                        {doc.success ? '✅ OK' : `❌ ${doc.error ?? 'Error'}`}
-                      </span>
-                    </Td>
-                    <Td right mono>{doc.sizeBytes ? `${doc.sizeBytes} b` : '—'}</Td>
+                {diag.comparison.map((c, i) => (
+                  <tr key={i} className="border-t" style={{ borderColor: 'var(--border)', backgroundColor: c.diff > 0.01 ? '#fef2f2' : 'transparent' }}>
+                    <Td>{c.field}</Td>
+                    <Td right mono>{c.manual.toFixed(2)}</Td>
+                    <Td right mono>{c.system.toFixed(2)}</Td>
+                    <Td right mono><span style={{ color: c.diff > 0.01 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>{c.diff > 0.01 ? c.diff.toFixed(2) : 'OK'}</span></Td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* ── Checks ───────────────────────────────────── */}
+          {/* ── 6. ПРОВЕРКИ ───────────────────────────────── */}
           <SectionTitle title={L.secChecks} />
-
           <div className="overflow-x-auto rounded-lg border" style={{ borderColor: 'var(--border)' }}>
             <table className="w-full text-xs">
-              <thead>
-                <tr>
-                  <Th>{L.checkId}</Th>
-                  <Th>{L.checkName}</Th>
-                  <Th>{L.docStatus}</Th>
-                  <Th>{L.expected}</Th>
-                  <Th>{L.actual}</Th>
-                  <Th>{L.details}</Th>
-                </tr>
-              </thead>
+              <thead><tr><Th>{L.id}</Th><Th>{L.check}</Th><Th>{L.status}</Th><Th>{L.expected}</Th><Th>{L.actual}</Th><Th>{L.details}</Th></tr></thead>
               <tbody>
-                {result.checks.map(c => (
-                  <tr key={c.id}
-                    className="border-t"
-                    style={{
-                      borderColor: 'var(--border)',
-                      backgroundColor: c.skipped ? 'transparent' : c.passed ? 'transparent' : '#fef2f2',
-                      opacity: c.skipped ? 0.55 : 1,
-                    }}>
-                    <Td mono>{c.id}</Td>
-                    <Td>{c.name}</Td>
-                    <Td>
-                      <span style={{ color: c.skipped ? '#6b7280' : c.passed ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
-                        {c.skipped ? '⏭' : c.passed ? '✅' : '❌'}
-                      </span>
-                    </Td>
-                    <Td mono>{c.expected}</Td>
-                    <Td mono>{c.actual}</Td>
-                    <Td>{c.details ?? '—'}</Td>
+                {itg.checks.map(c => (
+                  <tr key={c.id} className="border-t" style={{
+                    borderColor: 'var(--border)',
+                    backgroundColor: c.skipped ? 'transparent' : c.passed ? 'transparent' : '#fef2f2',
+                    opacity: c.skipped ? 0.55 : 1,
+                  }}>
+                    <Td mono>{c.id}</Td><Td>{c.name}</Td>
+                    <Td><span style={{ color: c.skipped ? '#6b7280' : c.passed ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                      {c.skipped ? 'SKIP' : c.passed ? 'PASS' : 'FAIL'}
+                    </span></Td>
+                    <Td mono>{c.expected}</Td><Td mono>{c.actual}</Td><Td>{c.details ?? '—'}</Td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* ── Export buttons ───────────────────────────── */}
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={() => downloadJson(result)}
+          {/* ── 7. ОШИБКИ ─────────────────────────────────── */}
+          {itg.failedChecks > 0 && (
+            <>
+              <SectionTitle title={L.secErrors} />
+              <div className="rounded-lg p-4 text-xs space-y-2" style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5' }}>
+                {itg.checks.filter(c => !c.passed && !c.skipped).map(c => (
+                  <div key={c.id}>
+                    <p className="font-semibold">{c.id}: {c.name}</p>
+                    <p>{L.expected}: {c.expected}</p>
+                    <p>{L.actual}: {c.actual}</p>
+                    {c.details && <p>{L.reason}: {c.details}</p>}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {(() => {
+            const diffs = diag.comparison.filter(c => c.diff > 0.01)
+            if (diffs.length === 0) return null
+            return (
+              <>
+                {itg.failedChecks === 0 && <SectionTitle title={L.secBalanceDiff} />}
+                <div className="rounded-lg p-4 text-xs space-y-1" style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fca5a5' }}>
+                  <p className="font-semibold">{diffs.length} {L.diffCount}:</p>
+                  {diffs.map((d, i) => (
+                    <p key={i}>{d.field}: {L.manual}={d.manual.toFixed(2)}, {L.system}={d.system.toFixed(2)}, {L.diff}={d.diff.toFixed(2)}</p>
+                  ))}
+                </div>
+              </>
+            )
+          })()}
+
+          {/* ── 8. СКАЧИВАНИЕ ─────────────────────────────── */}
+          <div className="flex flex-wrap gap-3 pt-6 border-t" style={{ borderColor: 'var(--border)' }}>
+            <button onClick={() => downloadFullJson(result)}
               className="rounded-lg px-4 py-2 text-sm font-medium"
-              style={{ backgroundColor: 'var(--accent)', color: 'white' }}
-            >
-              {L.downloadJson}
-            </button>
-            <button
-              onClick={() => downloadChecksCsv(result, L)}
+              style={{ backgroundColor: 'var(--accent)', color: 'white' }}>{L.dlFull}</button>
+            <button onClick={() => downloadTrialBalanceCsv(diag, result.periodLabel)}
               className="rounded-lg px-4 py-2 text-sm"
-              style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-            >
-              {L.downloadCsv}
-            </button>
+              style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>{L.dlTrialBal}</button>
+            <button onClick={() => downloadComparisonCsv(diag, result.periodLabel)}
+              className="rounded-lg px-4 py-2 text-sm"
+              style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>{L.dlComparison}</button>
+            <button onClick={() => downloadChecksCsv(itg, result.periodLabel)}
+              className="rounded-lg px-4 py-2 text-sm"
+              style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>{L.dlChecks}</button>
           </div>
 
         </div>
       )}
     </div>
   )
+}
+
+// ─── Download helpers ─────────────────────────────────────────────────────────
+
+function fileTag(periodLabel: string) {
+  return periodLabel.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-]/g, '')
+}
+
+function downloadFullJson(result: FullAuditResult) {
+  const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `full_audit_${fileTag(result.periodLabel)}_${result.integration.company.eik}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadTrialBalanceCsv(diag: AccountingDiagnosticsResult, periodLabel: string) {
+  const q = (v: string) => `"${v.replace(/"/g, '""')}"`
+  const header = ['Код сметка','Наименование','Тип','Оборот Дт','Оборот Кт','Крайно салдо','Страна'].map(q).join(';')
+  const rows = diag.trialBalance.map(r => [
+    q(r.account), q(r.accountLabel), q(r.accountType),
+    q(r.debitTurnover.toFixed(2)), q(r.creditTurnover.toFixed(2)),
+    q(Math.abs(r.closingBalance).toFixed(2)),
+    q(r.balanceSide === 'debit' ? 'Дт' : r.balanceSide === 'credit' ? 'Кт' : '—'),
+  ].join(';'))
+  rows.push([q('ИТОГО'),q(''),q(''),q(diag.trialBalanceCheck.totalDebit.toFixed(2)),q(diag.trialBalanceCheck.totalCredit.toFixed(2)),q(''),q('')].join(';'))
+  const csv = '\uFEFF' + [header, ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `trial_balance_${fileTag(periodLabel)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadComparisonCsv(diag: AccountingDiagnosticsResult, periodLabel: string) {
+  const q = (v: string) => `"${v.replace(/"/g, '""')}"`
+  const header = ['Показател','Ръчно','Системно','Разлика'].map(q).join(';')
+  const rows = diag.comparison.map(c => [q(c.field), q(c.manual.toFixed(2)), q(c.system.toFixed(2)), q(c.diff > 0.01 ? c.diff.toFixed(2) : 'OK')].join(';'))
+  const csv = '\uFEFF' + [header, ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `balance_comparison_${fileTag(periodLabel)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadChecksCsv(itg: IntegrationTestResult, periodLabel: string) {
+  const q = (v: string) => `"${v.replace(/"/g, '""')}"`
+  const header = ['ID','Проверка','Статус','Ожидаемо','Фактично','Детали'].map(q).join(';')
+  const rows = itg.checks.map(c => [q(c.id), q(c.name), q(c.skipped ? 'SKIP' : c.passed ? 'PASS' : 'FAIL'), q(c.expected), q(c.actual), q(c.details ?? '')].join(';'))
+  const csv = '\uFEFF' + [header, ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `checks_${fileTag(periodLabel)}_${itg.company.eik}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }

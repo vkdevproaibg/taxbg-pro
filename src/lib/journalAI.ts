@@ -113,10 +113,7 @@ export function transactionToJournalEntry(
   const rule = TRANSACTION_RULES[transaction.type]
   if (!rule) return null
 
-  const amount =
-    transaction.type === 'vehicle_expense'
-      ? transaction.amount * (transaction.deductiblePercent ?? 0.5)
-      : transaction.amount
+  const amount = transaction.amount
 
   return {
     date: transaction.date,

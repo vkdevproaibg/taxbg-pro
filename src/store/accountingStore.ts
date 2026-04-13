@@ -345,6 +345,35 @@ export const useAccountingStore = create<AccountingState>()(
             .map((e) => e.linkedTransactionId)
             .filter(Boolean)
         )
+
+        // Fix existing vehicle_expense entries that were created with the old
+        // deductiblePercent bug (amount was halved instead of full).
+        const vehicleTxMap = new Map(
+          transactions
+            .filter((t) => t.type === 'vehicle_expense')
+            .map((t) => [t.id, t])
+        )
+        let correctedEntries = journalState.entries
+        let correctedCount = 0
+        if (vehicleTxMap.size > 0) {
+          correctedEntries = journalState.entries.filter((e) => {
+            if (!e.linkedTransactionId) return true
+            const tx = vehicleTxMap.get(e.linkedTransactionId)
+            if (!tx) return true
+            // If existing entry has wrong amount (not equal to full tx amount),
+            // remove it so it gets re-created with the correct amount below.
+            if (e.debitAccount === '602' && e.creditAccount === '503' && Math.abs(e.amount - tx.amount) > 0.001) {
+              correctedCount++
+              linkedIds.delete(tx.id) // allow re-creation
+              return false
+            }
+            return true
+          })
+          if (correctedCount > 0) {
+            console.log(`[Migration] Removed ${correctedCount} vehicle_expense entries with incorrect amounts`)
+          }
+        }
+
         const newEntries: JournalEntry[] = []
         for (const tx of transactions) {
           if (linkedIds.has(tx.id)) continue
@@ -355,11 +384,13 @@ export const useAccountingStore = create<AccountingState>()(
           if (vatEntry)      newEntries.push({ ...vatEntry,      id: crypto.randomUUID() })
           if (vatInputEntry) newEntries.push({ ...vatInputEntry, id: crypto.randomUUID() })
         }
-        if (newEntries.length > 0) {
+        if (newEntries.length > 0 || correctedCount > 0) {
           useJournalStore.setState({
-            entries: [...journalState.entries, ...newEntries],
+            entries: [...correctedEntries, ...newEntries],
           })
-          console.log(`[Migration] Backfilled ${newEntries.length} journal entries`)
+          if (newEntries.length > 0) {
+            console.log(`[Migration] Backfilled ${newEntries.length} journal entries`)
+          }
         }
       },
 

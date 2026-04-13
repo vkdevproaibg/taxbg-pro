@@ -10,7 +10,7 @@ import {
   createVatJournalEntry,
   createVatInputCreditEntry,
 } from '../../lib/journalAI'
-import { buildOPR, buildBalanceSheet, oprToCsv, balanceToCsv } from '../../lib/financialReports'
+import { buildOPR, buildBalanceSheet, calculateCorporateTax, oprToCsv, balanceToCsv } from '../../lib/financialReports'
 import { calculateObrazec1, obrazec1ToCsv } from '../../lib/obrazec1'
 import { generateDDSXml, generateZKPOXml } from '../../lib/xmlGenerator'
 import { getRateValue } from '../../lib/taxRates'
@@ -448,7 +448,7 @@ function buildCompanyWithEmployees(companyId: string): {
     makeEmployee({ name: 'Мария Георгиева',position: 'Senior Developer',  grossSalary: 2500, egn: '9001012222', startDate: '2026-01-01' }, companyId),
     makeEmployee({ name: 'Петър Иванов',   position: 'Developer',         grossSalary: 1800, egn: '9501013333', startDate: '2026-02-01' }, companyId),
     makeEmployee({ name: 'Елена Стоянова', position: 'QA Engineer',       grossSalary: 1400, egn: '9101014444', startDate: '2026-01-01' }, companyId),
-    makeEmployee({ name: 'Георги Николов', position: 'Intern',            grossSalary: 620,  egn: '0101015555', startDate: '2026-05-01' }, companyId),
+    makeEmployee({ name: 'Георги Николов', position: 'Intern',            grossSalary: getRateValue('minWage', '2026-01-01'),  egn: '0101015555', startDate: '2026-05-01' }, companyId),
   ]
 
   // Employee 5 (Георги) terminated in October — set active=false after Oct
@@ -481,7 +481,23 @@ function buildCompanyWithEmployees(companyId: string): {
   // Remove the 2 salaries from base (we add them fresh above)
   const baseTxs = base.transactions.filter(t => t.type !== 'salary')
 
-  return { company, transactions: [...baseTxs, ...extraSalaries], employees }
+  // Extra income to cover 5 employees (base income 8000/mo is not enough)
+  const MONTHS_ALL = [
+    '2026-01','2026-02','2026-03','2026-04','2026-05','2026-06',
+    '2026-07','2026-08','2026-09','2026-10','2026-11','2026-12',
+  ]
+  const extraIncome: Transaction[] = MONTHS_ALL.map((m, i) =>
+    makeTransaction({
+      date: `${m}-05`,
+      type: 'income',
+      amount: 4000,
+      description: 'Консултантски услуги (допълнително)',
+      counterparty: 'Клиент Д ЕООД',
+      invoiceNumber: `INV-B${3001 + i}`,
+    }, companyId)
+  )
+
+  return { company, transactions: [...baseTxs, ...extraIncome, ...extraSalaries], employees }
 }
 
 // ─── Check runner helper ───────────────────────────────────────────────────────
@@ -537,11 +553,13 @@ function sumAccount(
 
 export async function runIntegrationTest(
   scenario: TestScenario,
+  periodFrom: string = '2026-01-01',
+  periodTo: string = '2026-12-31',
 ): Promise<IntegrationTestResult> {
   const t0 = performance.now()
   const companyId = uuid()
 
-  // 1. Generate scenario data
+  // 1. Generate scenario data (always full year)
   let scenarioData: {
     company: TestCompanyProfile
     transactions: Transaction[]
@@ -556,14 +574,17 @@ export async function runIntegrationTest(
     scenarioData = buildCompanyWithEmployees(companyId)
   }
 
-  const { company, transactions, employees } = scenarioData
+  const { company, employees } = scenarioData
+  // Filter transactions to selected period for reporting
+  const allTransactions = scenarioData.transactions
+  const transactions = allTransactions.filter(t => t.date >= periodFrom && t.date <= periodTo)
 
-  // 2. Build journal entries (pure, in-memory)
-  const journalEntries: JournalEntry[] = []
+  // 2. Build journal entries from ALL transactions (balance is cumulative)
+  const allJournalEntries: JournalEntry[] = []
 
   // Capital entry
   if (company.capital > 0) {
-    journalEntries.push({
+    allJournalEntries.push({
       id: uuid(),
       date: company.foundedDate,
       description: 'Внасяне на основен капитал',
@@ -576,11 +597,14 @@ export async function runIntegrationTest(
     })
   }
 
-  // From transactions
-  journalEntries.push(...buildJournalEntries(transactions))
+  // From ALL transactions (journal must be cumulative for balance)
+  allJournalEntries.push(...buildJournalEntries(allTransactions))
 
-  const FROM = '2026-01-01'
-  const TO   = '2026-12-31'
+  // Journal entries filtered to period (for OPR and trial balance turnovers)
+  const journalEntries = allJournalEntries.filter(e => e.date >= periodFrom && e.date <= periodTo)
+
+  const FROM = periodFrom
+  const TO   = periodTo
 
   // ── Transaction Summary ────────────────────────────────────────────────────
 
@@ -601,12 +625,12 @@ export async function runIntegrationTest(
   }
 
   const allDates = transactions.map(t => t.date).sort()
-  const periodFrom = allDates[0] ?? FROM
-  const periodTo   = allDates[allDates.length - 1] ?? TO
+  const txFirstDate = allDates[0] ?? FROM
+  const txLastDate  = allDates[allDates.length - 1] ?? TO
 
   const totalDays = Math.max(
     1,
-    (new Date(periodTo).getTime() - new Date(periodFrom).getTime()) / 86400000,
+    (new Date(txLastDate).getTime() - new Date(txFirstDate).getTime()) / 86400000,
   )
 
   const transactionsSummary = {
@@ -614,7 +638,7 @@ export async function runIntegrationTest(
     byType,
     byMonth,
     avgPerDay: Math.round((transactions.length / totalDays) * 100) / 100,
-    period: { from: periodFrom, to: periodTo },
+    period: { from: FROM, to: TO },
   }
 
   // ── Employee Summary ───────────────────────────────────────────────────────
@@ -671,7 +695,8 @@ export async function runIntegrationTest(
 
   // ── Balance ────────────────────────────────────────────────────────────────
 
-  const bs = buildBalanceSheet(journalEntries, TO, company.name, transactions)
+  // Balance uses ALL entries up to period end (cumulative) and ALL transactions for non-deductible calc
+  const bs = buildBalanceSheet(allJournalEntries, TO, company.name, allTransactions)
   const balanceResult = {
     totalAssets:  bs.totalAssets,
     totalPassive: bs.totalPassive,
@@ -1021,21 +1046,19 @@ export async function runIntegrationTest(
     ))
   }
 
-  // C7: totalExpenses = expense + vat_in + salary + depreciation + vehicle (deductible part)
-  // vat_in generates a Дт602/Кт503 entry (purchase cost → 602 external services)
+  // C7: totalExpenses = expense + vat_in + salary + depreciation + vehicle (full amount)
+  // Journal entries always reflect full amounts. Non-deductible adjustments are in OPR only.
   {
     const expenseTypes: TransactionType[] = ['expense','vat_in','salary','depreciation','vehicle_tax','vehicle_expense','asset_purchase']
     const expTxs = transactions.filter(t => expenseTypes.includes(t.type))
-    // vehicle_expense: only deductible part counts in journal (50%)
     const expectedExp = expTxs.reduce((s, t) => {
-      if (t.type === 'vehicle_expense') return s + t.amount * (t.deductiblePercent ?? 0.5)
       // asset_purchase goes to 205, not expense accounts — not in OPR
       if (t.type === 'asset_purchase') return s
       return s + t.amount
     }, 0)
     checks.push(check(
       'C7',
-      'totalExpenses = Σ разходни транзакции (дедуктибилна部分)',
+      'totalExpenses = Σ разходни транзакции (пълна сума)',
       expectedExp.toFixed(2),
       opr.totalExpenses.toFixed(2),
       near(expectedExp, opr.totalExpenses, 0.10),
@@ -1095,24 +1118,28 @@ export async function runIntegrationTest(
       : undefined,
   ))
 
-  // C12: capital >= 1
-  checks.push(check(
-    'C12',
-    'Основен капитал ≥ 1 €',
-    '≥ 1',
-    bs.capital.toFixed(2),
-    bs.capital >= 1,
-    bs.capital < 1
-      ? 'Не е намерена проводка Дт503/Кт102 за внасяне на капитал'
-      : undefined,
-  ))
+  // C12: capital >= 1 — skip for freelancers (legalForm='self'), they have no registered capital
+  if (company.legalForm === 'self') {
+    checks.push(checkSkip('C12', 'Основен капитал ≥ 1 €', 'Самоосигуряващ се — няма уставен капитал'))
+  } else {
+    checks.push(check(
+      'C12',
+      'Основен капитал ≥ 1 €',
+      '≥ 1',
+      bs.capital.toFixed(2),
+      bs.capital >= 1,
+      bs.capital < 1
+        ? 'Не е намерена проводка Дт503/Кт102 за внасяне на капитал'
+        : undefined,
+    ))
+  }
 
   // C13: If 122 entries exist — they appear in retained earnings
+  // Balance is cumulative — use allJournalEntries
   {
-    const ret122 = sumAccount(journalEntries, '122', 'credit') - sumAccount(journalEntries, '122', 'debit')
+    const ret122 = sumAccount(allJournalEntries, '122', 'credit', undefined, TO) - sumAccount(allJournalEntries, '122', 'debit', undefined, TO)
     const retInBS = bs.retainedEarnings
-    // They should match if any 122 entries exist
-    const has122 = journalEntries.some(e => e.debitAccount === '122' || e.creditAccount === '122')
+    const has122 = allJournalEntries.some(e => e.date <= TO && (e.debitAccount === '122' || e.creditAccount === '122'))
     const ok = !has122 || near(ret122, retInBS)
     checks.push(check(
       'C13',
@@ -1361,32 +1388,34 @@ export async function runIntegrationTest(
   }
 
   // C29: Bank in balance = debit503 - credit503
+  // Balance is cumulative — use allJournalEntries up to period end
   {
-    const d503 = sumAccount(journalEntries, '503', 'debit')
-    const c503 = sumAccount(journalEntries, '503', 'credit')
+    const d503 = sumAccount(allJournalEntries, '503', 'debit', undefined, TO)
+    const c503 = sumAccount(allJournalEntries, '503', 'credit', undefined, TO)
     const expected = Math.max(d503 - c503, 0)
     checks.push(check(
       'C29',
-      'Парични средства в баланса = Дт503 − Кт503',
+      'Парични средства в баланса = Дт503 − Кт503 (накопительно)',
       expected.toFixed(2),
       bs.bankBalance.toFixed(2),
       near(expected, bs.bankBalance),
-      `Дт503=${d503.toFixed(2)}, Кт503=${c503.toFixed(2)}`,
+      `Дт503=${d503.toFixed(2)}, Кт503=${c503.toFixed(2)} (от начала года до ${TO})`,
     ))
   }
 
   // C30: VAT in balance = credit451 - debit452
+  // Balance is cumulative — use allJournalEntries up to period end
   {
-    const c451 = sumAccount(journalEntries, '451', 'credit')
-    const d452 = sumAccount(journalEntries, '452', 'debit')
+    const c451 = sumAccount(allJournalEntries, '451', 'credit', undefined, TO)
+    const d452 = sumAccount(allJournalEntries, '452', 'debit', undefined, TO)
     const expected = Math.max(c451 - d452, 0)
     checks.push(check(
       'C30',
-      'ДДС в баланса = Кт451 − Дт452',
+      'ДДС в баланса = Кт451 − Дт452 (накопительно)',
       expected.toFixed(2),
       bs.vatPayable.toFixed(2),
       near(expected, bs.vatPayable),
-      `Кт451=${c451.toFixed(2)}, Дт452=${d452.toFixed(2)}`,
+      `Кт451=${c451.toFixed(2)}, Дт452=${d452.toFixed(2)} (от начала года до ${TO})`,
     ))
   }
 
@@ -1415,6 +1444,459 @@ export async function runIntegrationTest(
     skippedChecks,
     overallStatus: failedChecks === 0 ? 'PASS' : 'FAIL',
     generatedAt: new Date().toISOString(),
+    durationMs: Math.round(performance.now() - t0),
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Accounting Diagnostics ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface TransactionDiag {
+  txId: string
+  type: string
+  date: string
+  amount: number
+  description: string
+  entries: {
+    debitAccount: string
+    creditAccount: string
+    amount: number
+    description: string
+  }[]
+  amountMismatch: boolean   // true if any main entry amount !== tx.amount
+}
+
+export interface TrialBalanceRow {
+  account: string
+  accountType: 'active' | 'passive' | 'active-passive' | 'expense' | 'revenue'
+  accountLabel: string
+  openingBalance: number
+  debitTurnover: number
+  creditTurnover: number
+  closingBalance: number   // positive = debit balance, negative = credit balance
+  balanceSide: 'debit' | 'credit' | 'zero'
+}
+
+export interface ManualBalance {
+  assets: { account: string; amount: number }[]
+  totalAssets: number
+  liabilities: { account: string; amount: number }[]
+  totalLiabilities: number
+  revenue7xx: number
+  expense6xx: number
+  financialResult: number
+  nonDeductible: number
+  corporateTax: number
+  netProfit: number
+  totalPassive: number   // totalLiabilities + netProfit
+  difference: number     // totalAssets - totalPassive
+}
+
+export interface BalanceComparison {
+  field: string
+  manual: number
+  system: number
+  diff: number
+}
+
+export interface AccountingDiagnosticsResult {
+  transactionDiags: TransactionDiag[]
+  trialBalance: TrialBalanceRow[]
+  trialBalanceCheck: {
+    totalDebit: number
+    totalCredit: number
+    difference: number
+    isEqual: boolean
+  }
+  manualBalance: ManualBalance
+  systemBalance: {
+    totalAssets: number
+    totalPassive: number
+    difference: number
+    isBalanced: boolean
+    bankBalance: number
+    fixedAssets: number
+    capital: number
+    retainedEarnings: number
+    currentProfit: number
+    creditors: number
+    vatPayable: number
+    taxPayable: number
+  }
+  comparison: BalanceComparison[]
+  durationMs: number
+}
+
+const ACCOUNT_LABELS: Record<string, string> = {
+  '101': 'Основен капитал',
+  '102': 'Регистриран капитал',
+  '122': 'Неразпределена печалба',
+  '205': 'Компютри и оборудване',
+  '206': 'Транспортни средства',
+  '207': 'Офис мебели',
+  '241': 'Амортизация на ДМА',
+  '246': 'Амортизация на ТС',
+  '401': 'Задължения към доставчици',
+  '411': 'Вземания от клиенти',
+  '421': 'Задължения към персонала',
+  '451': 'ДДС начислен (изходящ)',
+  '452': 'ДДС данъчен кредит (входящ)',
+  '453': 'Данъчни задължения',
+  '461': 'Разчети с НОИ',
+  '493': 'Разчети със собственици',
+  '501': 'Каса',
+  '503': 'Разплащателна сметка',
+  '601': 'Разходи за материали',
+  '602': 'Разходи за външни услуги',
+  '603': 'Разходи за амортизация',
+  '604': 'Разходи за заплати',
+  '605': 'Разходи за осигуровки',
+  '606': 'Разходи за данъци и такси',
+  '609': 'Други разходи',
+  '703': 'Приходи от продажби на услуги',
+  '705': 'Приходи от продажби на стоки',
+  '729': 'Финансови приходи',
+}
+
+function getAccountType(code: string): TrialBalanceRow['accountType'] {
+  const cls = parseInt(code[0])
+  if (cls === 1) return 'passive'
+  if (cls === 2 || cls === 3 || cls === 5) return 'active'
+  if (cls === 4) return 'active-passive'
+  if (cls === 6) return 'expense'
+  if (cls === 7) return 'revenue'
+  return 'active'
+}
+
+export function runAccountingDiagnostics(
+  scenario: TestScenario = 'small_it_company',
+  periodFrom: string = '2026-01-01',
+  periodTo: string = '2026-12-31',
+): AccountingDiagnosticsResult {
+  const t0 = performance.now()
+  const companyId = crypto.randomUUID()
+
+  // ── 1. Build scenario (always full year) ──────────────────────────────────
+  let scenarioData: { company: TestCompanyProfile; transactions: Transaction[]; employees: Employee[] }
+  if (scenario === 'small_it_company') {
+    scenarioData = buildSmallItCompany(companyId)
+  } else if (scenario === 'freelancer') {
+    scenarioData = buildFreelancer(companyId)
+  } else {
+    scenarioData = buildCompanyWithEmployees(companyId)
+  }
+
+  const { company } = scenarioData
+  const allTransactions = scenarioData.transactions
+  const transactions = allTransactions.filter(t => t.date >= periodFrom && t.date <= periodTo)
+
+  // ── 2. Build journal entries ──────────────────────────────────────────────
+  const allJournalEntries: JournalEntry[] = []
+
+  // Capital entry
+  if (company.capital > 0) {
+    allJournalEntries.push({
+      id: crypto.randomUUID(),
+      date: company.foundedDate,
+      description: 'Внасяне на основен капитал',
+      debitAccount: '503',
+      creditAccount: '102',
+      amount: company.capital,
+      source: 'auto',
+      period: company.foundedDate.slice(0, 7),
+      companyId,
+    })
+  }
+
+  allJournalEntries.push(...buildJournalEntries(allTransactions))
+
+  // Period-filtered journal entries (for trial balance turnovers)
+  const journalEntries = allJournalEntries.filter(e => e.date >= periodFrom && e.date <= periodTo)
+  // All entries up to period end (for balance — cumulative)
+  const cumulativeEntries = allJournalEntries.filter(e => e.date <= periodTo)
+
+  // ── 3. Per-transaction diagnostics ────────────────────────────────────────
+  const transactionDiags: TransactionDiag[] = transactions.map(tx => {
+    const txEntries = journalEntries.filter(e => e.linkedTransactionId === tx.id)
+    // The "main" entry is the one matching the TRANSACTION_RULES (not VAT sub-entries)
+    const mainEntry = txEntries.find(e =>
+      !(e.debitAccount === '503' && e.creditAccount === '451') &&  // not vat_out VAT
+      !(e.debitAccount === '452' && e.creditAccount === '401')     // not vat_in credit
+    )
+    return {
+      txId: tx.id.slice(0, 8),
+      type: tx.type,
+      date: tx.date,
+      amount: tx.amount,
+      description: tx.description,
+      entries: txEntries.map(e => ({
+        debitAccount: e.debitAccount,
+        creditAccount: e.creditAccount,
+        amount: e.amount,
+        description: e.description,
+      })),
+      amountMismatch: mainEntry ? Math.abs(mainEntry.amount - tx.amount) > 0.001 : true,
+    }
+  })
+
+  // ── 4. Trial balance (оборотна ведомост) ──────────────────────────────────
+  // Collect all accounts from cumulative entries (so balance-only accounts appear)
+  const allAccounts = new Set<string>()
+  for (const e of cumulativeEntries) {
+    allAccounts.add(e.debitAccount)
+    allAccounts.add(e.creditAccount)
+  }
+
+  const trialBalance: TrialBalanceRow[] = [...allAccounts].sort().map(account => {
+    // Turnovers — period only (for the оборотна ведомост display)
+    const debitTurnover = journalEntries
+      .filter(e => e.debitAccount === account)
+      .reduce((s, e) => s + e.amount, 0)
+    const creditTurnover = journalEntries
+      .filter(e => e.creditAccount === account)
+      .reduce((s, e) => s + e.amount, 0)
+
+    // Closing balance — cumulative from start of year to end of period
+    const cumDebit = cumulativeEntries
+      .filter(e => e.debitAccount === account)
+      .reduce((s, e) => s + e.amount, 0)
+    const cumCredit = cumulativeEntries
+      .filter(e => e.creditAccount === account)
+      .reduce((s, e) => s + e.amount, 0)
+
+    const accountType = getAccountType(account)
+    const closingBalance = cumDebit - cumCredit  // positive = debit, negative = credit
+
+    return {
+      account,
+      accountType,
+      accountLabel: ACCOUNT_LABELS[account] ?? `Сметка ${account}`,
+      openingBalance: 0,
+      debitTurnover,
+      creditTurnover,
+      closingBalance,
+      balanceSide: closingBalance > 0.001 ? 'debit' as const
+        : closingBalance < -0.001 ? 'credit' as const
+        : 'zero' as const,
+    }
+  })
+
+  // ── 5. Trial balance check ────────────────────────────────────────────────
+  const totalDebit = trialBalance.reduce((s, r) => s + r.debitTurnover, 0)
+  const totalCredit = trialBalance.reduce((s, r) => s + r.creditTurnover, 0)
+
+  const trialBalanceCheck = {
+    totalDebit,
+    totalCredit,
+    difference: Math.abs(totalDebit - totalCredit),
+    isEqual: Math.abs(totalDebit - totalCredit) < 0.01,
+  }
+
+  // ── 6. Manual balance from trial balance ──────────────────────────────────
+  // Assets: accounts 1xx-5xx with debit closing balance
+  // Liabilities: accounts 1xx-5xx with credit closing balance
+  // 6xx/7xx: P&L accounts, not in balance — go through financial result
+  // Special netting: 451/452 (VAT) are netted into a single line
+
+  const assetItems: { account: string; amount: number }[] = []
+  const liabItems: { account: string; amount: number }[] = []
+
+  // Accounts that are netted separately — skip in the general loop
+  const NETTED_ACCOUNTS = new Set(['451', '452'])
+
+  for (const row of trialBalance) {
+    const cls = parseInt(row.account[0])
+    if (cls >= 6) continue  // 6xx, 7xx — P&L, not balance sheet
+    if (NETTED_ACCOUNTS.has(row.account)) continue  // handled below
+
+    // Special: contra-asset accounts (241, 246, 247) reduce assets
+    const isContraAsset = ['241', '246', '247'].includes(row.account)
+
+    if (isContraAsset) {
+      if (Math.abs(row.closingBalance) > 0.001) {
+        assetItems.push({ account: row.account, amount: row.closingBalance })
+      }
+      continue
+    }
+
+    if (row.closingBalance > 0.001) {
+      assetItems.push({ account: row.account, amount: row.closingBalance })
+    } else if (row.closingBalance < -0.001) {
+      liabItems.push({ account: row.account, amount: -row.closingBalance })
+    }
+  }
+
+  // Net VAT: 451 (credit balance = output VAT) vs 452 (debit balance = input VAT credit)
+  const row451 = trialBalance.find(r => r.account === '451')
+  const row452 = trialBalance.find(r => r.account === '452')
+  const credit451 = row451 ? row451.creditTurnover - row451.debitTurnover : 0
+  const debit452  = row452 ? row452.debitTurnover - row452.creditTurnover : 0
+  const netVat = credit451 - debit452  // positive = payable, negative = refundable
+  if (netVat > 0.001) {
+    liabItems.push({ account: '451-452 ДДС', amount: netVat })
+  } else if (netVat < -0.001) {
+    assetItems.push({ account: '451-452 ДДС', amount: -netVat })
+  }
+
+  // P&L from trial balance — use cumulative closing balances (not period turnovers)
+  // to match buildBalanceSheet which reads all entries up to periodTo
+  const revenue7xx = trialBalance
+    .filter(r => r.account.startsWith('7'))
+    .reduce((s, r) => s + (-r.closingBalance), 0)  // credit balance is negative in our convention
+  const expense6xx = trialBalance
+    .filter(r => r.account.startsWith('6'))
+    .reduce((s, r) => s + r.closingBalance, 0)     // debit balance is positive
+  const financialResult = revenue7xx - expense6xx
+
+  // Non-deductible expenses — cumulative up to period end
+  const nonDeductible = allTransactions
+    .filter(t => t.date <= periodTo && t.type === 'vehicle_expense')
+    .reduce((s, t) => s + t.amount * (1 - (t.deductiblePercent ?? 0.5)), 0)
+
+  const { corporateTax, netProfit } = calculateCorporateTax(financialResult, nonDeductible, periodFrom)
+
+  // Implicit corporate tax payable: if no 453 journal entries exist but there is
+  // a positive financial result, add the calculated corporate tax to liabilities.
+  // This mirrors buildBalanceSheet's implicitTaxPayable logic.
+  const row453 = trialBalance.find(r => r.account === '453')
+  const tax453Balance = row453 ? Math.max(row453.creditTurnover - row453.debitTurnover, 0) : 0
+  const implicitTaxPayable = Math.max(corporateTax - tax453Balance, 0)
+  if (implicitTaxPayable > 0.001) {
+    liabItems.push({ account: '453* данък (расчётно)', amount: implicitTaxPayable })
+  }
+
+  const totalAssets = assetItems.reduce((s, i) => s + i.amount, 0)
+  const totalLiabilities = liabItems.reduce((s, i) => s + i.amount, 0)
+
+  const totalPassive = totalLiabilities + netProfit
+  const manualDifference = totalAssets - totalPassive
+
+  const manualBalance: ManualBalance = {
+    assets: assetItems,
+    totalAssets,
+    liabilities: liabItems,
+    totalLiabilities,
+    revenue7xx,
+    expense6xx,
+    financialResult,
+    nonDeductible,
+    corporateTax,
+    netProfit,
+    totalPassive,
+    difference: manualDifference,
+  }
+
+  // ── 7. System balance (buildBalanceSheet) — cumulative up to period end ──
+  const bs = buildBalanceSheet(cumulativeEntries, periodTo, company.name, allTransactions)
+
+  const systemBalance = {
+    totalAssets: bs.totalAssets,
+    totalPassive: bs.totalPassive,
+    difference: bs.difference,
+    isBalanced: bs.isBalanced,
+    bankBalance: bs.bankBalance,
+    fixedAssets: bs.fixedAssets,
+    capital: bs.capital,
+    retainedEarnings: bs.retainedEarnings,
+    currentProfit: bs.currentProfit,
+    creditors: bs.creditors,
+    vatPayable: bs.vatPayable,
+    taxPayable: bs.taxPayable,
+  }
+
+  // ── 8. Comparison ─────────────────────────────────────────────────────────
+  const comparison: BalanceComparison[] = [
+    { field: 'Общо активи / totalAssets', manual: manualBalance.totalAssets, system: bs.totalAssets, diff: 0 },
+    { field: 'Общо пасиви / totalPassive', manual: manualBalance.totalPassive, system: bs.totalPassive, diff: 0 },
+    { field: 'Разлика (А-П) / difference', manual: manualBalance.difference, system: bs.difference, diff: 0 },
+    { field: 'Чиста печалба / netProfit', manual: manualBalance.netProfit, system: bs.currentProfit, diff: 0 },
+    { field: 'Корпоративен данък', manual: manualBalance.corporateTax, system: 0, diff: 0 },
+    { field: 'Финансов резултат (преди данък)', manual: manualBalance.financialResult, system: 0, diff: 0 },
+  ]
+  // Fill system corporateTax and financialResult from OPR
+  const opr = buildOPR(journalEntries, transactions, periodFrom, periodTo, company.name)
+  comparison[4].system = opr.corporateTax
+  comparison[5].system = opr.financialResult
+  for (const c of comparison) c.diff = Math.abs(c.manual - c.system)
+
+  // Per-account comparison: map manual items to system equivalents
+  const accountComparisons: BalanceComparison[] = []
+
+  // Bank
+  const manualBank = assetItems.find(i => i.account === '503')?.amount ?? 0
+  accountComparisons.push({ field: 'Банка (503)', manual: manualBank, system: bs.bankBalance, diff: Math.abs(manualBank - bs.bankBalance) })
+
+  // Fixed assets (205 - 241 + 206 - 246)
+  const manual205 = assetItems.find(i => i.account === '205')?.amount ?? 0
+  const manual241 = assetItems.find(i => i.account === '241')?.amount ?? 0
+  const manualFixed = manual205 + manual241  // 241 is already stored negative
+  accountComparisons.push({ field: 'ДМА (205-241)', manual: manualFixed, system: bs.fixedAssets, diff: Math.abs(manualFixed - bs.fixedAssets) })
+
+  // Capital (102)
+  const manualCapital = liabItems.find(i => i.account === '102')?.amount ?? 0
+  accountComparisons.push({ field: 'Капитал (102)', manual: manualCapital, system: bs.capital, diff: Math.abs(manualCapital - bs.capital) })
+
+  // Creditors (401)
+  const manualCreditors = liabItems.find(i => i.account === '401')?.amount ?? 0
+  accountComparisons.push({ field: 'Доставчици (401)', manual: manualCreditors, system: bs.creditors, diff: Math.abs(manualCreditors - bs.creditors) })
+
+  // VAT netted (451-452)
+  const manualVatNetted = liabItems.find(i => i.account === '451-452 ДДС')?.amount
+    ?? -(assetItems.find(i => i.account === '451-452 ДДС')?.amount ?? 0)
+  accountComparisons.push({ field: 'ДДС нетно (451-452)', manual: manualVatNetted, system: bs.vatPayable, diff: Math.abs(manualVatNetted - bs.vatPayable) })
+
+  // Implicit tax payable
+  const manualTaxPayable = liabItems.find(i => i.account === '453* данък (расчётно)')?.amount ?? tax453Balance
+  // System reports taxPayable from explicit 453 entries; implicit goes into totalLiabilities
+  const systemTaxTotal = bs.taxPayable + (bs.totalLiabilities - bs.creditors - bs.vatPayable - bs.salaryPayable - bs.taxPayable)
+  accountComparisons.push({ field: 'Данък (453/расчётно)', manual: manualTaxPayable, system: implicitTaxPayable, diff: Math.abs(manualTaxPayable - implicitTaxPayable) })
+
+  // Dividend / owners (493) — system includes it via extraAssets in dynamic handler
+  const manual493 = assetItems.find(i => i.account === '493')?.amount ?? 0
+  // To get system's 493 value: totalAssets - bankBalance - fixedAssets - debtors
+  const systemExtraAssets = bs.totalAssets - bs.bankBalance - bs.fixedAssets - bs.debtors
+  accountComparisons.push({ field: 'Разч. собственици (493)', manual: manual493, system: systemExtraAssets, diff: Math.abs(manual493 - systemExtraAssets) })
+
+  return {
+    transactionDiags,
+    trialBalance,
+    trialBalanceCheck,
+    manualBalance,
+    systemBalance,
+    comparison: [...comparison, ...accountComparisons],
+    durationMs: Math.round(performance.now() - t0),
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── Full Audit (combined integration test + diagnostics) ────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface FullAuditResult {
+  integration: IntegrationTestResult
+  diagnostics: AccountingDiagnosticsResult
+  periodFrom: string
+  periodTo: string
+  periodLabel: string
+  durationMs: number
+}
+
+export async function runFullAudit(
+  scenario: TestScenario,
+  periodFrom: string = '2026-01-01',
+  periodTo: string = '2026-12-31',
+  periodLabel: string = '2026',
+): Promise<FullAuditResult> {
+  const t0 = performance.now()
+  const integration = await runIntegrationTest(scenario, periodFrom, periodTo)
+  const diagnostics = runAccountingDiagnostics(scenario, periodFrom, periodTo)
+  return {
+    integration,
+    diagnostics,
+    periodFrom,
+    periodTo,
+    periodLabel,
     durationMs: Math.round(performance.now() - t0),
   }
 }

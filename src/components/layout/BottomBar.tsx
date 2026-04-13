@@ -60,10 +60,12 @@ export default function BottomBar() {
             <span>Практикум</span>
           </NavLink>
 
-          <NavLink to="/testing" className={linkClass} style={linkStyle}>
-            <span className="text-sm leading-none">🧪</span>
-            <span>Тест</span>
-          </NavLink>
+          {(profileRole === 'superadmin' || profileRole === 'superuser') && (
+            <NavLink to="/testing" className={linkClass} style={linkStyle}>
+              <span className="text-sm leading-none">🧪</span>
+              <span>Тест</span>
+            </NavLink>
+          )}
 
           <NavLink to="/expat" className={linkClass} style={linkStyle}>
             <span className="text-sm leading-none">🇧🇬</span>
