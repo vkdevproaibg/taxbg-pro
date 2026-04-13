@@ -6,6 +6,7 @@ import BottomBar from './BottomBar'
 import HelpPopover from '../ui/HelpPopover'
 import CookieBanner from '../ui/CookieBanner'
 import PurgeBanner from '../ui/PurgeBanner'
+import SupportButton from '../ui/SupportButton'
 
 export default function Layout({ children }: PropsWithChildren) {
   return (
@@ -41,6 +42,7 @@ export default function Layout({ children }: PropsWithChildren) {
 
       <HelpPopover />
       <CookieBanner />
+      <SupportButton />
     </div>
   )
 }

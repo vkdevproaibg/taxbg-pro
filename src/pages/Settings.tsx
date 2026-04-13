@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { getAuditSummary } from '../lib/taxRatesAudit'
 import { useUserStore } from '../store/userStore'
@@ -8,6 +8,8 @@ import PurgeAccountModal from '../components/ui/PurgeAccountModal'
 import type { AppLanguage, LegalForm } from '../store/userStore'
 import { fetchOpenRouterModels } from '../lib/llmCatalog'
 import { useT } from '../lib/useT'
+import { useAuthStore } from '../store/authStore'
+import { createLocalBackup, restoreLocalBackup } from '../lib/localBackup'
 
 type SettingsTab = 'profile' | 'ai' | 'integrations' | 'system'
 
@@ -336,6 +338,7 @@ const cardStyle = {
 export default function Settings() {
   const store = useUserStore()
   const integrations = useIntegrationsStore()
+  const isDemo = useAuthStore(s => s.isDemo)
   const ui = UI[store.language]
   const t = useT()
 
@@ -958,6 +961,8 @@ export default function Settings() {
                     {ui.system.dataText}
                   </p>
                 </div>
+
+                {isDemo && <BackupSection />}
               </div>
             </div>
           )}
@@ -1123,6 +1128,72 @@ const PURGE_TEXTS: Record<AppLanguage, {
     cancelling: 'Отменя се...',
     cancelError: 'Неуспешна отмяна.',
   },
+}
+
+const BACKUP_TEXTS = {
+  ru: { title: 'Резервное копие', download: 'Скачать бэкап', restore: 'Восстановить из файла', restored: 'Восстановлено ключей', errors: 'Ошибок', selectFile: 'Выберите JSON файл' },
+  uk: { title: 'Резервне копіювання', download: 'Завантажити бекап', restore: 'Відновити з файлу', restored: 'Відновлено ключів', errors: 'Помилок', selectFile: 'Оберіть JSON файл' },
+  en: { title: 'Backup', download: 'Download backup', restore: 'Restore from file', restored: 'Keys restored', errors: 'Errors', selectFile: 'Select JSON file' },
+  bg: { title: 'Резервно копие', download: 'Изтегли бекъп', restore: 'Възстанови от файл', restored: 'Възстановени ключове', errors: 'Грешки', selectFile: 'Изберете JSON файл' },
+} as const
+
+function BackupSection() {
+  const language = useUserStore(s => s.language)
+  const texts = BACKUP_TEXTS[language] ?? BACKUP_TEXTS.ru
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [result, setResult] = useState<{ restored: number; errors: string[] } | null>(null)
+
+  const handleDownload = () => {
+    const json = createLocalBackup()
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `taxbg-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const res = restoreLocalBackup(reader.result as string)
+      setResult(res)
+    }
+    reader.readAsText(file)
+  }
+
+  return (
+    <div className="border-t pt-3" style={{ borderColor: 'var(--border)' }}>
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        {texts.title}
+      </h2>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={handleDownload}
+          className="rounded-xl border px-4 py-2 text-sm"
+          style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+        >
+          {texts.download}
+        </button>
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="rounded-xl border px-4 py-2 text-sm"
+          style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
+        >
+          {texts.restore}
+        </button>
+        <input ref={fileRef} type="file" accept=".json" onChange={handleRestore} className="hidden" />
+      </div>
+      {result && (
+        <p className="mt-2 text-xs" style={{ color: result.errors.length > 0 ? '#dc2626' : 'var(--accent)' }}>
+          {texts.restored}: {result.restored}. {texts.errors}: {result.errors.length}
+        </p>
+      )}
+    </div>
+  )
 }
 
 function PurgeAccountSection() {

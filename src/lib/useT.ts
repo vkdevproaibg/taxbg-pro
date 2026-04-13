@@ -216,6 +216,14 @@ const translations = {
 
     // Help popover
     help_disclaimer: 'TaxBG AI · данные 2026 · не является юридической консультацией',
+
+    // Diagnostics & support
+    support_title: 'Поддержка',
+    support_describe: 'Опишите проблему',
+    support_send: 'Отправить диагностику',
+    support_ticket_created: 'Тикет создан',
+    support_download: 'Скачать диагностику',
+    health_warning: 'Обнаружены проблемы',
   },
   uk: {
     nav_dashboard: 'Дашборд',
@@ -408,6 +416,14 @@ const translations = {
     system_data_info: 'Всі дані зберігаються локально в браузері',
 
     help_disclaimer: 'TaxBG AI · дані 2026 · не є юридичною консультацією',
+
+    // Diagnostics & support
+    support_title: 'Підтримка',
+    support_describe: 'Опишіть проблему',
+    support_send: 'Надіслати діагностику',
+    support_ticket_created: 'Тікет створено',
+    support_download: 'Завантажити діагностику',
+    health_warning: 'Виявлено проблеми',
   },
   en: {
     nav_dashboard: 'Dashboard',
@@ -600,6 +616,14 @@ const translations = {
     system_data_info: 'All data is stored locally in your browser',
 
     help_disclaimer: 'TaxBG AI · 2026 data · not legal advice',
+
+    // Diagnostics & support
+    support_title: 'Support',
+    support_describe: 'Describe the issue',
+    support_send: 'Send diagnostics',
+    support_ticket_created: 'Ticket created',
+    support_download: 'Download diagnostics',
+    health_warning: 'Issues detected',
   },
   bg: {
     nav_dashboard: 'Табло',
@@ -792,6 +816,14 @@ const translations = {
     system_data_info: 'Всички данни се съхраняват локално в браузъра',
 
     help_disclaimer: 'TaxBG AI · данни 2026 · не е правна консултация',
+
+    // Diagnostics & support
+    support_title: 'Поддръжка',
+    support_describe: 'Опишете проблема',
+    support_send: 'Изпрати диагностика',
+    support_ticket_created: 'Тикетът е създаден',
+    support_download: 'Изтегли диагностика',
+    health_warning: 'Открити проблеми',
   },
 } as const
 

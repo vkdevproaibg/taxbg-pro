@@ -14,8 +14,10 @@ import {
   type AuditEvent,
 } from '../lib/supabaseAdmin'
 import { supabase } from '../lib/supabase'
+import { loadUserContext, type UserContext } from '../lib/remoteAccess'
+import { getSnapshots, createSnapshot, restoreSnapshot, executeWithSafety } from '../lib/dataSnapshot'
 
-type AdminTab = 'stats' | 'users' | 'logs' | 'legislation' | 'corrections' | 'analytics'
+type AdminTab = 'stats' | 'users' | 'logs' | 'legislation' | 'corrections' | 'analytics' | 'support' | 'user_view'
 
 const T = {
   ru: {
@@ -57,6 +59,29 @@ const T = {
     count: 'Кол-во',
     date: 'Дата',
     events: 'События',
+    tabSupport: 'Поддержка',
+    tabUserView: 'Просмотр',
+    ticketStatus: 'Статус',
+    ticketDate: 'Дата',
+    ticketDesc: 'Описание',
+    ticketAiDiag: 'AI Диагноз',
+    ticketDiagJson: 'Диагностика (JSON)',
+    ticketTakeWork: 'Взять в работу',
+    ticketResolve: 'Отметить решённым',
+    noTickets: 'Нет тикетов',
+    userViewSelect: 'Выберите пользователя для просмотра',
+    userViewBtn: 'Просмотреть',
+    userTransactions: 'Транзакции',
+    userBalance: 'Баланс / ОПР',
+    userEmployees: 'Сотрудники',
+    userSnapshots: 'Снимки',
+    snapshotRestore: 'Откатить',
+    snapshotCreate: 'Создать снимок',
+    snapshotConfirm: 'Вы уверены? Это заменит текущие данные.',
+    snapshotConfirm2: 'Подтвердить откат',
+    dangerActions: 'Действия',
+    fixJournals: 'Создать снимок + исправить проводки',
+    executing: 'Выполняем...',
   },
   en: {
     accessDenied: 'Access denied',
@@ -97,6 +122,29 @@ const T = {
     count: 'Count',
     date: 'Date',
     events: 'Events',
+    tabSupport: 'Support',
+    tabUserView: 'User View',
+    ticketStatus: 'Status',
+    ticketDate: 'Date',
+    ticketDesc: 'Description',
+    ticketAiDiag: 'AI Diagnosis',
+    ticketDiagJson: 'Diagnostics (JSON)',
+    ticketTakeWork: 'Take in progress',
+    ticketResolve: 'Mark resolved',
+    noTickets: 'No tickets',
+    userViewSelect: 'Select a user to view',
+    userViewBtn: 'View',
+    userTransactions: 'Transactions',
+    userBalance: 'Balance / P&L',
+    userEmployees: 'Employees',
+    userSnapshots: 'Snapshots',
+    snapshotRestore: 'Restore',
+    snapshotCreate: 'Create snapshot',
+    snapshotConfirm: 'Are you sure? This will replace current data.',
+    snapshotConfirm2: 'Confirm restore',
+    dangerActions: 'Actions',
+    fixJournals: 'Snapshot + fix journal entries',
+    executing: 'Executing...',
   },
   bg: {
     accessDenied: 'Достъпът е отказан',
@@ -137,6 +185,29 @@ const T = {
     count: 'Брой',
     date: 'Дата',
     events: 'Събития',
+    tabSupport: 'Поддръжка',
+    tabUserView: 'Преглед',
+    ticketStatus: 'Статус',
+    ticketDate: 'Дата',
+    ticketDesc: 'Описание',
+    ticketAiDiag: 'AI Диагноза',
+    ticketDiagJson: 'Диагностика (JSON)',
+    ticketTakeWork: 'Вземи в работа',
+    ticketResolve: 'Маркирай решен',
+    noTickets: 'Няма тикети',
+    userViewSelect: 'Изберете потребител за преглед',
+    userViewBtn: 'Преглед',
+    userTransactions: 'Транзакции',
+    userBalance: 'Баланс / ОПР',
+    userEmployees: 'Служители',
+    userSnapshots: 'Снимки',
+    snapshotRestore: 'Възстанови',
+    snapshotCreate: 'Създай снимка',
+    snapshotConfirm: 'Сигурни ли сте? Това ще замени текущите данни.',
+    snapshotConfirm2: 'Потвърди възстановяване',
+    dangerActions: 'Действия',
+    fixJournals: 'Снимка + поправи проводки',
+    executing: 'Изпълняваме...',
   },
   uk: {
     accessDenied: 'Доступ заборонено',
@@ -177,6 +248,29 @@ const T = {
     count: 'Кількість',
     date: 'Дата',
     events: 'Події',
+    tabSupport: 'Підтримка',
+    tabUserView: 'Перегляд',
+    ticketStatus: 'Статус',
+    ticketDate: 'Дата',
+    ticketDesc: 'Опис',
+    ticketAiDiag: 'AI Діагноз',
+    ticketDiagJson: 'Діагностика (JSON)',
+    ticketTakeWork: 'Взяти в роботу',
+    ticketResolve: 'Позначити вирішеним',
+    noTickets: 'Немає тікетів',
+    userViewSelect: 'Оберіть користувача для перегляду',
+    userViewBtn: 'Переглянути',
+    userTransactions: 'Транзакції',
+    userBalance: 'Баланс / ОПР',
+    userEmployees: 'Співробітники',
+    userSnapshots: 'Знімки',
+    snapshotRestore: 'Відкатити',
+    snapshotCreate: 'Створити знімок',
+    snapshotConfirm: 'Ви впевнені? Це замінить поточні дані.',
+    snapshotConfirm2: 'Підтвердити відкат',
+    dangerActions: 'Дії',
+    fixJournals: 'Знімок + виправити проводки',
+    executing: 'Виконуємо...',
   },
 }
 
@@ -230,6 +324,20 @@ export default function SuperAdmin() {
     dailyActivity: { date: string; events: number }[]
   } | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
+
+  // Support tickets state
+  const [tickets, setTickets] = useState<Record<string, unknown>[]>([])
+  const [ticketsLoading, setTicketsLoading] = useState(false)
+  const [selectedTicket, setSelectedTicket] = useState<Record<string, unknown> | null>(null)
+  const [diagExpanded, setDiagExpanded] = useState(false)
+
+  // User view state
+  const [userContext, setUserContext] = useState<UserContext | null>(null)
+  const [userViewLoading, setUserViewLoading] = useState(false)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [userSnapshots, setUserSnapshots] = useState<Record<string, unknown>[]>([])
+  const [restoreConfirm, setRestoreConfirm] = useState<string | null>(null)
+  const [actionRunning, setActionRunning] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -354,6 +462,90 @@ export default function SuperAdmin() {
     if (tab === 'analytics' && !analyticsData && !analyticsLoading) loadAnalytics()
   }, [tab])
 
+  // Lazy-load support tickets
+  const loadTickets = async () => {
+    if (!supabase) return
+    setTicketsLoading(true)
+    const { data } = await supabase
+      .from('support_tickets')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
+    setTickets(data ?? [])
+    setTicketsLoading(false)
+  }
+  useEffect(() => {
+    if (tab === 'support' && tickets.length === 0 && !ticketsLoading) loadTickets()
+  }, [tab])
+
+  // User view helpers
+  const handleViewUser = async (profileId: string) => {
+    setUserViewLoading(true)
+    setSelectedUserId(profileId)
+    const ctx = await loadUserContext(profileId)
+    setUserContext(ctx)
+    // Load snapshots for first company
+    const firstCompany = ctx.companies[0] as { id: string } | undefined
+    if (firstCompany?.id) {
+      const snaps = await getSnapshots(firstCompany.id)
+      setUserSnapshots(snaps as unknown as Record<string, unknown>[])
+    }
+    setUserViewLoading(false)
+  }
+
+  const handleUpdateTicket = async (ticketId: string, patch: Record<string, unknown>) => {
+    if (!supabase) return
+    await supabase.from('support_tickets').update(patch).eq('id', ticketId)
+    loadTickets()
+    setSelectedTicket(null)
+  }
+
+  const handleRestoreSnapshot = async (snapshotId: string) => {
+    if (!profile?.id) return
+    setActionRunning(true)
+    await restoreSnapshot(snapshotId, profile.id)
+    if (selectedUserId) await handleViewUser(selectedUserId)
+    setRestoreConfirm(null)
+    setActionRunning(false)
+  }
+
+  const handleCreateSnapshot = async () => {
+    if (!profile?.id || !userContext) return
+    const firstCompany = userContext.companies[0] as { id: string } | undefined
+    if (!firstCompany?.id) return
+    setActionRunning(true)
+    await createSnapshot({
+      profileId: selectedUserId ?? profile.id,
+      companyId: firstCompany.id,
+      triggerType: 'manual',
+    })
+    const snaps = await getSnapshots(firstCompany.id)
+    setUserSnapshots(snaps as unknown as Record<string, unknown>[])
+    setActionRunning(false)
+  }
+
+  const handleFixJournals = async () => {
+    if (!profile?.id || !userContext) return
+    const firstCompany = userContext.companies[0] as { id: string } | undefined
+    if (!firstCompany?.id) return
+    setActionRunning(true)
+    try {
+      await executeWithSafety({
+        profileId: profile.id,
+        companyId: firstCompany.id,
+        actionName: 'fix_journals_admin',
+        action: async () => {
+          // Backfill journal entries via accounting store
+          const { useAccountingStore } = await import('../store/accountingStore')
+          useAccountingStore.getState().backfillJournalEntries()
+        },
+      })
+    } catch (err) {
+      console.error('[superadmin] fix journals failed:', err)
+    }
+    setActionRunning(false)
+  }
+
   const TABS: { id: AdminTab; label: string; icon: string; badge?: number }[] = [
     { id: 'stats',       label: labels.tabStats,       icon: '📊' },
     { id: 'users',       label: labels.tabUsers,       icon: '👥' },
@@ -361,6 +553,8 @@ export default function SuperAdmin() {
     { id: 'legislation', label: labels.tabLegislation, icon: '📜', badge: pendingAlerts },
     { id: 'corrections', label: labels.tabCorrections, icon: '🛠', badge: pendingCorrections },
     { id: 'analytics',   label: labels.tabAnalytics,   icon: '📈' },
+    { id: 'support',     label: labels.tabSupport,     icon: '🎫' },
+    { id: 'user_view',   label: labels.tabUserView,    icon: '👁' },
   ]
 
   return (
@@ -797,6 +991,326 @@ export default function SuperAdmin() {
                   </button>
                 </div>
               </>
+            )}
+          </div>
+        )}
+
+        {/* ── Support Tickets ── */}
+        {tab === 'support' && (
+          <div className="max-w-4xl space-y-3">
+            {ticketsLoading && (
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{labels.loading}</p>
+            )}
+
+            {!ticketsLoading && tickets.length === 0 && (
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{labels.noTickets}</p>
+            )}
+
+            {selectedTicket ? (
+              <div className="space-y-4">
+                <button
+                  onClick={() => setSelectedTicket(null)}
+                  className="text-xs underline"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  &larr; Back
+                </button>
+                <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent)' }}>
+                      {selectedTicket.status as string}
+                    </span>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {new Date(selectedTicket.created_at as string).toLocaleString()}
+                    </span>
+                  </div>
+
+                  {selectedTicket.user_description && (
+                    <div className="mb-3">
+                      <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{labels.ticketDesc}</p>
+                      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{selectedTicket.user_description as string}</p>
+                    </div>
+                  )}
+
+                  {selectedTicket.ai_diagnosis && (
+                    <div className="mb-3">
+                      <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{labels.ticketAiDiag}</p>
+                      <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{selectedTicket.ai_diagnosis as string}</p>
+                    </div>
+                  )}
+
+                  {selectedTicket.ai_suggested_fix && (
+                    <div className="mb-3">
+                      <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Suggested fix</p>
+                      <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{selectedTicket.ai_suggested_fix as string}</p>
+                    </div>
+                  )}
+
+                  <div className="mb-3">
+                    <button
+                      onClick={() => setDiagExpanded(!diagExpanded)}
+                      className="text-xs underline"
+                      style={{ color: 'var(--accent)' }}
+                    >
+                      {labels.ticketDiagJson} {diagExpanded ? '▲' : '▼'}
+                    </button>
+                    {diagExpanded && (
+                      <pre className="mt-2 text-[11px] p-3 rounded-lg overflow-auto max-h-80"
+                        style={{ backgroundColor: 'var(--surface)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                        {JSON.stringify(selectedTicket.diagnostic_json, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 mt-4">
+                    {selectedTicket.status !== 'in_progress' && selectedTicket.status !== 'resolved' && (
+                      <button
+                        onClick={() => handleUpdateTicket(selectedTicket.id as string, {
+                          status: 'in_progress', resolved_by: profile?.id,
+                        })}
+                        className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                        style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+                      >
+                        {labels.ticketTakeWork}
+                      </button>
+                    )}
+                    {selectedTicket.status !== 'resolved' && (
+                      <button
+                        onClick={() => handleUpdateTicket(selectedTicket.id as string, {
+                          status: 'resolved', resolved_by: profile?.id,
+                          resolved_at: new Date().toISOString(),
+                        })}
+                        className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                        style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                      >
+                        {labels.ticketResolve}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              tickets.map((ticket) => (
+                <div
+                  key={ticket.id as string}
+                  onClick={() => { setSelectedTicket(ticket); setDiagExpanded(false) }}
+                  className="rounded-xl p-4 cursor-pointer hover:opacity-80 transition-opacity"
+                  style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border)' }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="rounded-full px-2 py-0.5 text-xs font-medium"
+                        style={{
+                          backgroundColor: (ticket.status as string) === 'resolved' ? '#dcfce7' : 'var(--accent-light)',
+                          color: (ticket.status as string) === 'resolved' ? '#16a34a' : 'var(--accent)',
+                        }}>
+                        {ticket.status as string}
+                      </span>
+                      <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+                        {(ticket.user_description as string) || (ticket.ai_diagnosis as string)?.slice(0, 80) || '—'}
+                      </p>
+                    </div>
+                    <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>
+                      {new Date(ticket.created_at as string).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-xs mt-1 font-mono truncate" style={{ color: 'var(--text-muted)' }}>
+                    profile: {(ticket.profile_id as string)?.slice(0, 8)} · id: {(ticket.id as string)?.slice(0, 8)}
+                  </p>
+                </div>
+              ))
+            )}
+
+            <button
+              onClick={loadTickets}
+              disabled={ticketsLoading}
+              className="text-xs px-3 py-1.5 rounded-lg disabled:opacity-50 mt-4"
+              style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+            >
+              {ticketsLoading ? '...' : labels.refresh}
+            </button>
+          </div>
+        )}
+
+        {/* ── User View ── */}
+        {tab === 'user_view' && (
+          <div className="max-w-4xl space-y-4">
+            {!userContext && !userViewLoading && (
+              <div className="space-y-3">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{labels.userViewSelect}</p>
+                {users.map(u => (
+                  <div key={u.profileId}
+                    className="rounded-xl p-3 flex items-center justify-between"
+                    style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+                    <div>
+                      <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{u.profileId.slice(0, 12)}...</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="rounded-full px-2 py-0.5 text-xs" style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
+                          {u.subscription}
+                        </span>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{u.role}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleViewUser(u.profileId)}
+                      className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                      style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+                    >
+                      {labels.userViewBtn}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {userViewLoading && (
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{labels.loading}</p>
+            )}
+
+            {userContext && !userViewLoading && (
+              <div className="space-y-4">
+                <button
+                  onClick={() => { setUserContext(null); setSelectedUserId(null) }}
+                  className="text-xs underline"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  &larr; Back
+                </button>
+
+                {/* Profile info */}
+                <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs font-mono mb-1" style={{ color: 'var(--text-muted)' }}>
+                    {(userContext.profile as Record<string, unknown>)?.id as string}
+                  </p>
+                  <div className="flex gap-2 text-xs">
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      {(userContext.profile as Record<string, unknown>)?.role as string}
+                    </span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {(userContext.profile as Record<string, unknown>)?.subscription as string}
+                    </span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {(userContext.profile as Record<string, unknown>)?.language as string}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Transactions — read only */}
+                <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+                  <p className="text-sm font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+                    {labels.userTransactions} ({userContext.transactions.length})
+                  </p>
+                  <div className="max-h-60 overflow-auto space-y-1">
+                    {userContext.transactions.slice(0, 50).map((tx, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs py-1 border-b" style={{ borderColor: 'var(--border)' }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono" style={{ color: 'var(--text-muted)' }}>{tx.date as string}</span>
+                          <span className="truncate" style={{ color: 'var(--text-secondary)' }}>{tx.description as string}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="rounded-full px-1.5 py-0.5 text-[10px]" style={{ backgroundColor: 'var(--surface)', color: 'var(--text-muted)' }}>
+                            {tx.type as string}
+                          </span>
+                          <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                            {Number(tx.amount).toFixed(2)} &euro;
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Employees — read only */}
+                <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+                  <p className="text-sm font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+                    {labels.userEmployees} ({userContext.employees.length})
+                  </p>
+                  <div className="space-y-1">
+                    {userContext.employees.map((emp, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs py-1">
+                        <span style={{ color: 'var(--text-secondary)' }}>{emp.position as string}</span>
+                        <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                          {Number(emp.gross_salary).toFixed(2)} &euro;
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Snapshots */}
+                <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {labels.userSnapshots} ({userSnapshots.length})
+                    </p>
+                    <button
+                      onClick={handleCreateSnapshot}
+                      disabled={actionRunning}
+                      className="text-xs px-3 py-1 rounded-lg font-medium disabled:opacity-50"
+                      style={{ backgroundColor: 'var(--accent)', color: 'white' }}
+                    >
+                      {labels.snapshotCreate}
+                    </button>
+                  </div>
+                  <div className="space-y-1 max-h-40 overflow-auto">
+                    {userSnapshots.map((snap) => (
+                      <div key={snap.id as string} className="flex items-center justify-between text-xs py-1.5 border-b" style={{ borderColor: 'var(--border)' }}>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono" style={{ color: 'var(--text-muted)' }}>
+                            {new Date(snap.created_at as string).toLocaleString()}
+                          </span>
+                          <span className="rounded-full px-1.5 py-0.5 text-[10px]"
+                            style={{ backgroundColor: 'var(--surface)', color: 'var(--text-muted)' }}>
+                            {snap.trigger_type as string}
+                          </span>
+                        </div>
+                        <div>
+                          {restoreConfirm === (snap.id as string) ? (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleRestoreSnapshot(snap.id as string)}
+                                disabled={actionRunning}
+                                className="text-[10px] px-2 py-0.5 rounded font-bold disabled:opacity-50"
+                                style={{ backgroundColor: '#dc2626', color: 'white' }}
+                              >
+                                {actionRunning ? '...' : labels.snapshotConfirm2}
+                              </button>
+                              <button onClick={() => setRestoreConfirm(null)} className="text-[10px] px-2 py-0.5 rounded"
+                                style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                                &times;
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setRestoreConfirm(snap.id as string)}
+                              className="text-[10px] px-2 py-0.5 rounded"
+                              style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                            >
+                              {labels.snapshotRestore}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Danger actions */}
+                <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--surface-card)', border: '2px solid #dc2626' }}>
+                  <p className="text-sm font-semibold mb-3" style={{ color: '#dc2626' }}>
+                    {labels.dangerActions}
+                  </p>
+                  <button
+                    onClick={handleFixJournals}
+                    disabled={actionRunning}
+                    className="text-xs px-4 py-2 rounded-lg font-medium disabled:opacity-50"
+                    style={{ border: '1px solid #dc2626', color: '#dc2626' }}
+                  >
+                    {actionRunning ? labels.executing : labels.fixJournals}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { runMigration } from './lib/migration'
 import PracticalLearning from './pages/PracticalLearning'
@@ -39,6 +39,7 @@ import { useCompaniesStore } from './store/companiesStore'
 import { useNotificationsStore } from './store/notificationsStore'
 import { ensureCapitalEntry } from './lib/journalAI'
 import { initAnalytics, trackPageView } from './lib/analytics'
+import { runHealthCheck } from './lib/healthCheck'
 
 function App() {
   const { initialize, isLoading, isDemo } = useAuthStore()
@@ -48,10 +49,19 @@ function App() {
   const activeCompanyId = useCompaniesStore((s) => s.activeCompanyId)
   const transactionsCount = useAccountingStore((s) => s.transactions.length)
 
+  const [healthBanner, setHealthBanner] = useState<string | null>(null)
   const location = useLocation()
 
   useEffect(() => {
-    initialize()
+    initialize().then(() => {
+      // Non-blocking health check after auth is ready
+      runHealthCheck().then(hc => {
+        const problems: string[] = []
+        if (!hc.localStorageAvailable) problems.push('localStorage unavailable')
+        if (!hc.browserSupported) problems.push('Browser not fully supported')
+        if (problems.length > 0) setHealthBanner(problems.join('; '))
+      }).catch(() => { /* non-fatal */ })
+    })
     runMigration()
     initAnalytics()
     useAccountingStore.getState().backfillJournalEntries()
@@ -119,6 +129,22 @@ function App() {
   if (needsOnboarding) return <Onboarding />
 
   return (
+    <>
+      {healthBanner && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 10000,
+          padding: '8px 16px', textAlign: 'center', fontSize: 13, fontWeight: 600,
+          background: '#fef3c7', color: '#92400e', borderBottom: '1px solid #f59e0b',
+        }}>
+          {healthBanner}
+          <button
+            onClick={() => setHealthBanner(null)}
+            style={{ marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#92400e', fontWeight: 700 }}
+          >
+            &times;
+          </button>
+        </div>
+      )}
     <Routes>
       <Route path="/auth" element={<Auth />} />
       <Route path="/privacy" element={<Privacy />} />
@@ -157,6 +183,7 @@ function App() {
         </Layout>
       } />
     </Routes>
+    </>
   )
 }
 

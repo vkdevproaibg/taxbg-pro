@@ -153,6 +153,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Check for pending company transfers addressed to this user
       await get().refreshPendingTransfers()
+
+      // Fire-and-forget daily snapshot for active company
+      try {
+        const { useCompaniesStore } = await import('./companiesStore')
+        const companyId = useCompaniesStore.getState().activeCompanyId
+        const clientAccountId = useCompaniesStore.getState().clientAccountId
+        if (companyId && data.id) {
+          const { createDailySnapshotIfNeeded } = await import('../lib/dataSnapshot')
+          createDailySnapshotIfNeeded(data.id, clientAccountId, companyId).catch(err =>
+            console.warn('[authStore] daily snapshot failed:', err)
+          )
+        }
+      } catch { /* non-fatal */ }
     }
 
     set({ isLoading: false })
