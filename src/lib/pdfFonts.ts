@@ -1,3 +1,4 @@
+import fontkit from '@pdf-lib/fontkit'
 import { PDFDocument, PDFFont } from 'pdf-lib'
 
 // ─────────────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ export async function embedCyrillicFonts(
     loadFontBytes('bold'),
   ])
 
+  doc.registerFontkit(fontkit)
   const font = await doc.embedFont(regularBytes, { subset: true })
   const bold = await doc.embedFont(boldBytes, { subset: true })
 
