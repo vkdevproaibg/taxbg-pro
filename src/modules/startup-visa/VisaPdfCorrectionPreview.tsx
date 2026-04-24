@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import {
   buildVisaFieldValues,
@@ -15,6 +15,17 @@ interface Props {
   form: VisaFormData
   overrides: VisaPdfOverrides
   setOverrides: Dispatch<SetStateAction<VisaPdfOverrides>>
+}
+
+type InteractionMode = 'move' | 'edit'
+
+interface DragState {
+  key: VisaFieldKey
+  pointerId: number
+  startX: number
+  startY: number
+  startDx: number
+  startDy: number
 }
 
 const PAGE_IMAGE_COUNT = 4
@@ -52,7 +63,13 @@ function getDisplayValue(
   return baseValues[key] ?? ''
 }
 
-function getFieldStyle(key: VisaFieldKey, overrides: VisaPdfOverrides, selected: boolean) {
+function getFieldStyle(
+  key: VisaFieldKey,
+  overrides: VisaPdfOverrides,
+  selected: boolean,
+  mode: InteractionMode,
+  dragging: boolean,
+) {
   const [x, y, width] = FIELDS[key]
   const dx = overrides.offsets?.[key]?.dx ?? 0
   const dy = overrides.offsets?.[key]?.dy ?? 0
@@ -77,6 +94,10 @@ function getFieldStyle(key: VisaFieldKey, overrides: VisaPdfOverrides, selected:
     overflow: 'hidden',
     outline: 'none',
     boxSizing: 'border-box',
+    zIndex: selected ? 2 : 1,
+    cursor: mode === 'move' ? (dragging ? 'grabbing' : 'grab') : 'text',
+    userSelect: mode === 'move' ? 'none' : 'text',
+    touchAction: mode === 'move' ? 'none' : 'auto',
   } as const
 }
 
@@ -87,6 +108,9 @@ export default function VisaPdfCorrectionPreview({
 }: Props) {
   const baseValues = buildVisaFieldValues(form)
   const [selectedField, setSelectedField] = useState<VisaFieldKey | null>(null)
+  const [mode, setMode] = useState<InteractionMode>('move')
+  const [draggingField, setDraggingField] = useState<VisaFieldKey | null>(null)
+  const dragRef = useRef<DragState | null>(null)
 
   const setTextOverride = (key: VisaFieldKey, rawValue: string) => {
     const nextValue = rawValue.replace(/\n/g, ' ')
@@ -118,6 +142,67 @@ export default function VisaPdfCorrectionPreview({
       }
       return { ...prev, offsets: nextOffsets }
     })
+  }
+
+  const setFieldOffset = (key: VisaFieldKey, dx: number, dy: number) => {
+    setOverrides(prev => {
+      const nextOffsets = { ...(prev.offsets ?? {}) }
+      if (dx === 0 && dy === 0) delete nextOffsets[key]
+      else nextOffsets[key] = { dx, dy }
+
+      return {
+        ...prev,
+        offsets: Object.keys(nextOffsets).length > 0 ? nextOffsets : undefined,
+      }
+    })
+  }
+
+  const beginDrag = (
+    key: VisaFieldKey,
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    setSelectedField(key)
+    if (mode !== 'move') return
+
+    event.preventDefault()
+    const current = overrides.offsets?.[key] ?? { dx: 0, dy: 0 }
+    dragRef.current = {
+      key,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startDx: current.dx,
+      startDy: current.dy,
+    }
+    setDraggingField(key)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  const dragMove = (
+    key: VisaFieldKey,
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    const drag = dragRef.current
+    if (!drag || drag.key !== key || drag.pointerId !== event.pointerId) return
+
+    event.preventDefault()
+    setFieldOffset(
+      key,
+      Math.round(drag.startDx + (event.clientX - drag.startX)),
+      Math.round(drag.startDy + (event.clientY - drag.startY)),
+    )
+  }
+
+  const endDrag = (
+    key: VisaFieldKey,
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    const drag = dragRef.current
+    if (!drag || drag.key !== key || drag.pointerId !== event.pointerId) return
+
+    dragRef.current = null
+    setDraggingField(null)
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
   }
 
   const resetSelected = () => {
@@ -154,6 +239,28 @@ export default function VisaPdfCorrectionPreview({
         }}
       >
         <div className="flex gap-2 flex-wrap items-center">
+          <button
+            onClick={() => setMode('move')}
+            className="rounded-lg px-3 py-2 text-xs font-medium"
+            style={{
+              border: mode === 'move' ? '1px solid var(--accent)' : '1px solid var(--border)',
+              backgroundColor: mode === 'move' ? 'var(--accent-light)' : 'white',
+              color: mode === 'move' ? 'var(--accent-text)' : 'var(--text-primary)',
+            }}
+          >
+            Перемещение мышью
+          </button>
+          <button
+            onClick={() => setMode('edit')}
+            className="rounded-lg px-3 py-2 text-xs font-medium"
+            style={{
+              border: mode === 'edit' ? '1px solid var(--accent)' : '1px solid var(--border)',
+              backgroundColor: mode === 'edit' ? 'var(--accent-light)' : 'white',
+              color: mode === 'edit' ? 'var(--accent-text)' : 'var(--text-primary)',
+            }}
+          >
+            Редактирование текста
+          </button>
           <button
             onClick={() => nudgeSelected(-1, 0)}
             disabled={!selectedField}
@@ -228,14 +335,15 @@ export default function VisaPdfCorrectionPreview({
         </div>
 
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Выберите поле на бланке, при необходимости поправьте сам текст прямо поверх страницы,
-          затем подвигайте его кнопками до точного совпадения. Эти правки применяются при
-          скачивании PDF.
+          В режиме перемещения поле можно схватить мышью и утащить в нужное место.
+          В режиме редактирования можно поправить сам текст прямо поверх страницы.
+          Все правки применяются при скачивании PDF.
         </p>
 
         {selectedField && (
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            Выбрано: {getFieldTitle(selectedField)} · dx {selectedOffset.dx} · dy {selectedOffset.dy}
+            Режим: {mode === 'move' ? 'перемещение' : 'редактирование'} ·
+            {' '}Выбрано: {getFieldTitle(selectedField)} · dx {selectedOffset.dx} · dy {selectedOffset.dy}
           </p>
         )}
       </div>
@@ -273,16 +381,26 @@ export default function VisaPdfCorrectionPreview({
                 .map(key => (
                   <div
                     key={key}
-                    contentEditable
+                    contentEditable={mode === 'edit'}
                     suppressContentEditableWarning
-                    spellCheck={false}
+                    spellCheck={mode === 'edit'}
                     tabIndex={0}
                     onFocus={() => setSelectedField(key)}
+                    onPointerDown={e => beginDrag(key, e)}
+                    onPointerMove={e => dragMove(key, e)}
+                    onPointerUp={e => endDrag(key, e)}
+                    onPointerCancel={e => endDrag(key, e)}
                     onInput={e => setTextOverride(key, e.currentTarget.textContent ?? '')}
                     onKeyDown={e => {
                       if (e.key === 'Enter') e.preventDefault()
                     }}
-                    style={getFieldStyle(key, overrides, selectedField === key)}
+                    style={getFieldStyle(
+                      key,
+                      overrides,
+                      selectedField === key,
+                      mode,
+                      draggingField === key,
+                    )}
                   >
                     {getDisplayValue(key, baseValues, overrides)}
                   </div>
