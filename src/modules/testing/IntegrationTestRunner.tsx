@@ -250,7 +250,7 @@ export default function FullAuditReport() {
     setProgress(0)
 
     const selVal = periodType === 'month' ? monthVal : periodType === 'quarter' ? quarterVal : yearVal
-    const { from, to, label, fileTag } = periodToDates(periodType, selVal)
+    const { from, to } = periodToDates(periodType, selVal)
 
     const displayLabel = periodType === 'month' ? getMonthLabel(monthVal)
       : periodType === 'quarter' ? quarterVal.replace('-', ' ')

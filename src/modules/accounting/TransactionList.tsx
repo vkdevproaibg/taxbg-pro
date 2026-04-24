@@ -3,7 +3,6 @@ import type { Transaction } from '../../store/accountingStore'
 import { useCompanyRole } from '../../hooks/useCompanyRole'
 import { useAuthStore } from '../../store/authStore'
 import { useMemo, useState } from 'react'
-import { useT } from '../../lib/useT'
 import { useUserStore } from '../../store/userStore'
 
 interface Props {
@@ -36,7 +35,6 @@ function TxRow({
   onApprove,
   onReject,
   canApprove,
-  canEdit,
 }: {
   tx: Transaction
   onDelete: (id: string) => void
@@ -44,7 +42,6 @@ function TxRow({
   onApprove?: (id: string) => void
   onReject?: (id: string) => void
   canApprove?: boolean
-  canEdit?: boolean
 }) {
   const meta = TYPE_META[tx.type] ?? { label: tx.type, color: 'bg-slate-50 text-slate-600', income: true }
 

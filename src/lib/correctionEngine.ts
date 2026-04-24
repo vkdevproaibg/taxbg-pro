@@ -350,7 +350,6 @@ export function generateCorrectionBatch(
   companyId: string,
   reason: string,
 ): { batch: NewJournalBatch; lines: NewJournalLine[] } {
-  const today = new Date().toISOString().slice(0, 10)
   const createdAt = new Date().toISOString()
 
   const batch: NewJournalBatch = {

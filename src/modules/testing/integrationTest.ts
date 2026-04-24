@@ -451,9 +451,6 @@ function buildCompanyWithEmployees(companyId: string): {
     makeEmployee({ name: 'Георги Николов', position: 'Intern',            grossSalary: getRateValue('minWage', '2026-01-01'),  egn: '0101015555', startDate: '2026-05-01' }, companyId),
   ]
 
-  // Employee 5 (Георги) terminated in October — set active=false after Oct
-  const georgi = employees.find(e => e.name === 'Георги Николов')!
-
   // Add salary transactions for all employees by month
   const MONTHS = [
     '2026-01','2026-02','2026-03','2026-04','2026-05','2026-06',
@@ -746,10 +743,12 @@ export async function runIntegrationTest(
 
   // ── Payroll Summary ────────────────────────────────────────────────────────
 
-  let payrollSummary: IntegrationTestResult['payrollSummary'] | undefined
+  type PayrollSummary = NonNullable<IntegrationTestResult['payrollSummary']>
+
+  let payrollSummary: PayrollSummary | undefined
 
   if (employees.length > 0 && company.hasEmployees) {
-    const payByMonth: IntegrationTestResult['payrollSummary']['byMonth'] = {}
+    const payByMonth: PayrollSummary['byMonth'] = {}
     const months = [
       '2026-01','2026-02','2026-03','2026-04','2026-05','2026-06',
       '2026-07','2026-08','2026-09','2026-10','2026-11','2026-12',
@@ -773,7 +772,7 @@ export async function runIntegrationTest(
       }
     }
 
-    const ann = Object.values(payByMonth).reduce(
+    const ann = Object.values(payByMonth).reduce<PayrollSummary['annualTotal']>(
       (acc, v) => ({
         gross:          acc.gross          + v.totalGross,
         employerContrib:acc.employerContrib+ v.totalEmployerContrib,

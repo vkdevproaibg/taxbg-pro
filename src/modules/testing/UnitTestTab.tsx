@@ -3,7 +3,7 @@ import { UNIT_TEST_SCENARIOS } from './testScenarios'
 
 export default function UnitTestTab() {
   const [results, setResults] = useState<
-    Record<string, { passed: boolean; details: string } | null>
+    Record<string, { passed: boolean; details: string }>
   >({})
   const [running, setRunning] = useState<string | null>(null)
 
@@ -34,7 +34,6 @@ export default function UnitTestTab() {
     setRunning(null)
   }
 
-  const total = UNIT_TEST_SCENARIOS.length
   const done = Object.keys(results).length
   const passed = Object.values(results).filter(r => r?.passed).length
 
