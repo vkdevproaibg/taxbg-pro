@@ -557,7 +557,7 @@ export default function OwnerDashboard() {
 
   const urgentNotifications = notifications
     .filter((n) => !n.dismissedAt && (n.severity === 'critical' || n.severity === 'warning'))
-    .sort((a, b) => (a.severity === 'critical' ? -1 : 1))
+    .sort((a, _b) => (a.severity === 'critical' ? -1 : 1))
     .slice(0, 3)
   const hasCritical = urgentNotifications.some((n) => n.severity === 'critical')
 

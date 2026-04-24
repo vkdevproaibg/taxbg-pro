@@ -1,73 +1,52 @@
-# React + TypeScript + Vite
+# TaxBG Pro
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Tax accounting system for IT entrepreneurs in Bulgaria. React + TypeScript + Vite + Supabase.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+cp .env.example .env   # fill in your keys
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Environment Variables
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Variable | Description |
+|---|---|
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `VITE_OPENROUTER_API_KEY` | OpenRouter API key (optional, for AI features) |
+| `VITE_LLM_MODEL` | LLM model ID (default: `anthropic/claude-sonnet-4-5`) |
+| `VITE_APP_URL` | App URL for OpenRouter referer header |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (optional) |
+| `VITE_STRIPE_PRICE_ID` | Stripe price ID (optional) |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Build
+
+```bash
+npm run build    # outputs to dist/
+npm run preview  # preview production build locally
 ```
+
+## Deploy
+
+### Vercel
+
+1. Connect your GitHub repo at [vercel.com](https://vercel.com)
+2. Framework preset: **Vite** (auto-detected)
+3. Add environment variables in Project Settings > Environment Variables
+4. Deploy — `vercel.json` handles SPA routing automatically
+
+### Netlify
+
+1. Connect your GitHub repo at [app.netlify.com](https://app.netlify.com)
+2. Build command: `npm run build`, publish directory: `dist` (configured in `netlify.toml`)
+3. Add environment variables in Site Settings > Environment Variables
+4. Deploy — `netlify.toml` handles SPA redirects automatically
+
+### Notes
+
+- The app works in **demo mode** without Supabase credentials (all data stored in localStorage)
+- AI features require an OpenRouter API key configured per-user in Settings
+- Supabase migrations are in `supabase/migrations/` — run via Supabase CLI or dashboard

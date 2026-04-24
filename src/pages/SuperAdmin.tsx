@@ -1026,21 +1026,21 @@ export default function SuperAdmin() {
                     </span>
                   </div>
 
-                  {selectedTicket.user_description && (
+                  {Boolean(selectedTicket.user_description) && (
                     <div className="mb-3">
                       <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{labels.ticketDesc}</p>
                       <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{selectedTicket.user_description as string}</p>
                     </div>
                   )}
 
-                  {selectedTicket.ai_diagnosis && (
+                  {Boolean(selectedTicket.ai_diagnosis) && (
                     <div className="mb-3">
                       <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{labels.ticketAiDiag}</p>
                       <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{selectedTicket.ai_diagnosis as string}</p>
                     </div>
                   )}
 
-                  {selectedTicket.ai_suggested_fix && (
+                  {Boolean(selectedTicket.ai_suggested_fix) && (
                     <div className="mb-3">
                       <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Suggested fix</p>
                       <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{selectedTicket.ai_suggested_fix as string}</p>

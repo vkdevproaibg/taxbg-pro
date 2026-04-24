@@ -142,7 +142,7 @@ export default function Sidebar() {
       <CompanySwitcher />
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+      <nav className="flex-1 overflow-y-auto scrollbar-hide px-2 py-3 space-y-4">
         {groups.map((group) => (
           <div key={group.labelKey}>
             <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider"
