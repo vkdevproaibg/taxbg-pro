@@ -49,4 +49,4 @@ npm run preview  # preview production build locally
 
 - The app works in **demo mode** without Supabase credentials (all data stored in localStorage)
 - AI features require an OpenRouter API key configured per-user in Settings
-- Supabase migrations are in `supabase/migrations/` — run via Supabase CLI or dashboard
+- Supabase migrations are  in `supabase/migrations/` — run via Supabase CLI or dashboard
