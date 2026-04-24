@@ -26,7 +26,7 @@ export interface Transaction {
   description: string
   amount: number           // EUR, винаги положително
   type: TransactionType
-  vatRate?: 0.20 | 0.09 | 0
+  vatRate?: number
   vatAmount?: number
   // За appstore / googleplay / stripe
   grossAmount?: number     // брутна сума преди комисия (ако известна)

@@ -1225,7 +1225,6 @@ export async function runIntegrationTest(
 
     // C19: osigBase = min(gross, maxOsig)
     {
-      const rateDate = '2026-01-01'
       const ob = calculateObrazec1(activeEmps, '2026-01', company.name, company.eik)
       const wrongBase = ob.rows.filter(r => !near(r.osigBase, Math.min(r.employee.grossSalary, maxOsig)))
       checks.push(check(
@@ -1849,7 +1848,6 @@ export function runAccountingDiagnostics(
   // Implicit tax payable
   const manualTaxPayable = liabItems.find(i => i.account === '453* данък (расчётно)')?.amount ?? tax453Balance
   // System reports taxPayable from explicit 453 entries; implicit goes into totalLiabilities
-  const systemTaxTotal = bs.taxPayable + (bs.totalLiabilities - bs.creditors - bs.vatPayable - bs.salaryPayable - bs.taxPayable)
   accountComparisons.push({ field: 'Данък (453/расчётно)', manual: manualTaxPayable, system: implicitTaxPayable, diff: Math.abs(manualTaxPayable - implicitTaxPayable) })
 
   // Dividend / owners (493) — system includes it via extraAssets in dynamic handler
