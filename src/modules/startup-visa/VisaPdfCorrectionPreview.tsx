@@ -368,6 +368,10 @@ export default function VisaPdfCorrectionPreview({
     event.currentTarget.releasePointerCapture?.(event.pointerId)
   }
 
+  const selectField = (key: VisaFieldKey) => {
+    setSelectedField(key)
+  }
+
   const resetSelected = () => {
     if (!selectedField) return
 
@@ -532,9 +536,9 @@ export default function VisaPdfCorrectionPreview({
           </div>
 
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            В режиме перемещения поле можно схватить мышью и утащить в нужное место.
-            В режиме редактирования можно поправить сам текст прямо поверх страницы.
-            Все правки применяются при скачивании PDF.
+            Сначала щёлкните по нужному полю в PDF. В режиме перемещения поле можно схватить мышью
+            и утащить в нужное место. В режиме редактирования можно поправить сам текст прямо
+            поверх страницы. Все правки применяются при скачивании PDF.
           </p>
 
         {selectedField && (
@@ -593,7 +597,10 @@ export default function VisaPdfCorrectionPreview({
                         suppressContentEditableWarning
                         spellCheck={mode === 'edit'}
                         tabIndex={0}
-                        onFocus={() => setSelectedField(key)}
+                        onFocus={() => selectField(key)}
+                        onClick={() => selectField(key)}
+                        onMouseDown={() => selectField(key)}
+                        onTouchStart={() => selectField(key)}
                         onPointerDown={e => beginDrag(key, e)}
                         onPointerMove={e => dragMove(key, e)}
                         onPointerUp={e => endDrag(key, e)}
