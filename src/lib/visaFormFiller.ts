@@ -204,9 +204,28 @@ export interface VisaPdfFieldOffset {
   dy: number
 }
 
+export const DEFAULT_VISA_FONT_SIZE = 8.5
+export const MIN_VISA_FONT_SIZE = 6
+export const MAX_VISA_FONT_SIZE = 14
+export const VISA_FONT_SIZE_STEP = 0.5
+
 export interface VisaPdfOverrides {
   text?: Partial<Record<VisaFieldKey, string>>
   offsets?: Partial<Record<VisaFieldKey, VisaPdfFieldOffset>>
+  fontSizes?: Partial<Record<VisaFieldKey, number>>
+}
+
+export function normalizeVisaFontSize(fontSize?: number): number {
+  if (!Number.isFinite(fontSize)) return DEFAULT_VISA_FONT_SIZE
+  const rounded = Math.round((fontSize ?? DEFAULT_VISA_FONT_SIZE) / VISA_FONT_SIZE_STEP) * VISA_FONT_SIZE_STEP
+  return Math.min(MAX_VISA_FONT_SIZE, Math.max(MIN_VISA_FONT_SIZE, rounded))
+}
+
+export function getVisaFieldFontSize(
+  key: VisaFieldKey,
+  overrides: VisaPdfOverrides,
+): number {
+  return normalizeVisaFontSize(overrides.fontSizes?.[key])
 }
 
 export function buildVisaFieldValues(
@@ -376,7 +395,6 @@ export async function fillVisaForm(
   const { font } = await embedCyrillicFonts(pdfDoc)
   const pages = pdfDoc.getPages()
   const INK = rgb(0, 0, 0.55) // dark blue — typed text appearance
-  const SZ = 8.5
   const values = buildVisaFieldValues(form)
   const textOverrides = overrides.text ?? {}
   const offsetOverrides = overrides.offsets ?? {}
@@ -392,7 +410,13 @@ export async function fillVisaForm(
     const page = pages[pg]
     if (!page) return
     const offset = offsetOverrides[key]
-    const fitted = fitTextToWidth(value.trim(), font, SZ, maxW)
+    const fitted = fitTextToWidth(
+      value.trim(),
+      font,
+      getVisaFieldFontSize(key, overrides),
+      maxW,
+      MIN_VISA_FONT_SIZE,
+    )
     page.drawText(fitted.text, {
       x: x + (offset?.dx ?? 0),
       y: y - (offset?.dy ?? 0),

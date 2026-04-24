@@ -1037,7 +1037,10 @@ export default function StartupFormTab() {
           <button
             onClick={async () => {
               try {
-                await fillVisaForm(TEST_FORM_DATA, { offsets: pdfOverrides.offsets })
+                await fillVisaForm(TEST_FORM_DATA, {
+                  offsets: pdfOverrides.offsets,
+                  fontSizes: pdfOverrides.fontSizes,
+                })
               } catch (err) {
                 alert('Ошибка теста: ' + (err as Error).message)
               }
