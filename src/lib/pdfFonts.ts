@@ -59,8 +59,10 @@ export async function embedCyrillicFonts(
   ])
 
   doc.registerFontkit(fontkit)
-  const font = await doc.embedFont(regularBytes, { subset: true })
-  const bold = await doc.embedFont(boldBytes, { subset: true })
+  // Noto Sans subsetting breaks glyph placement in some PDF viewers for this form.
+  // Embedding the full font keeps Cyrillic rendering stable.
+  const font = await doc.embedFont(regularBytes, { subset: false })
+  const bold = await doc.embedFont(boldBytes, { subset: false })
 
   return { font, bold }
 }
