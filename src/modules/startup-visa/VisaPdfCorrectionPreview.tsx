@@ -101,6 +101,34 @@ function getDisplayValue(
   return baseValues[key] ?? ''
 }
 
+function getControlButtonStyle(enabled: boolean, highlighted = false) {
+  if (!enabled) {
+    return {
+      border: '1px solid var(--border)',
+      backgroundColor: 'var(--surface-card)',
+      color: 'var(--text-muted)',
+      opacity: 0.55,
+      cursor: 'not-allowed',
+    } as const
+  }
+
+  if (highlighted) {
+    return {
+      border: '1px solid var(--accent)',
+      backgroundColor: 'var(--accent-light)',
+      color: 'var(--accent-text)',
+      cursor: 'pointer',
+    } as const
+  }
+
+  return {
+    border: '1px solid var(--border)',
+    backgroundColor: 'white',
+    color: 'var(--text-primary)',
+    cursor: 'pointer',
+  } as const
+}
+
 function buildAlignmentLookup(groups: VisaFieldKey[][]) {
   const lookup: Partial<Record<VisaFieldKey, VisaFieldKey[]>> = {}
   for (const group of groups) {
@@ -372,6 +400,11 @@ export default function VisaPdfCorrectionPreview({
     : DEFAULT_VISA_FONT_SIZE
   const selectedRowFieldCount = selectedField ? getAlignedFieldKeys('row', selectedField).length : 0
   const selectedColumnFieldCount = selectedField ? getAlignedFieldKeys('column', selectedField).length : 0
+  const hasSelectedField = selectedField !== null
+  const canDecreaseFont = hasSelectedField && selectedFontSize > MIN_VISA_FONT_SIZE
+  const canIncreaseFont = hasSelectedField && selectedFontSize < MAX_VISA_FONT_SIZE
+  const canAlignRow = hasSelectedField && selectedRowFieldCount > 1
+  const canAlignColumn = hasSelectedField && selectedColumnFieldCount > 1
 
   return (
     <div className="space-y-4">
@@ -415,109 +448,73 @@ export default function VisaPdfCorrectionPreview({
             </button>
             <button
               onClick={() => changeSelectedFontSize(-VISA_FONT_SIZE_STEP)}
-              disabled={!selectedField || selectedFontSize <= MIN_VISA_FONT_SIZE}
+              disabled={!canDecreaseFont}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'white',
-                color: 'var(--text-primary)',
-              }}
+              style={getControlButtonStyle(canDecreaseFont, hasSelectedField)}
             >
               A−
             </button>
             <button
               onClick={() => changeSelectedFontSize(VISA_FONT_SIZE_STEP)}
-              disabled={!selectedField || selectedFontSize >= MAX_VISA_FONT_SIZE}
+              disabled={!canIncreaseFont}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'white',
-                color: 'var(--text-primary)',
-              }}
+              style={getControlButtonStyle(canIncreaseFont, hasSelectedField)}
             >
               A+
             </button>
             <button
               onClick={() => nudgeSelected(-1, 0)}
-              disabled={!selectedField}
+              disabled={!hasSelectedField}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'white',
-                color: 'var(--text-primary)',
-              }}
+              style={getControlButtonStyle(hasSelectedField)}
             >
               ← Влево
             </button>
             <button
               onClick={() => nudgeSelected(1, 0)}
-              disabled={!selectedField}
+              disabled={!hasSelectedField}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'white',
-                color: 'var(--text-primary)',
-              }}
+              style={getControlButtonStyle(hasSelectedField)}
             >
               Вправо →
             </button>
             <button
               onClick={() => nudgeSelected(0, -1)}
-              disabled={!selectedField}
+              disabled={!hasSelectedField}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'white',
-                color: 'var(--text-primary)',
-              }}
+              style={getControlButtonStyle(hasSelectedField)}
             >
               ↑ Выше
             </button>
             <button
               onClick={() => nudgeSelected(0, 1)}
-              disabled={!selectedField}
+              disabled={!hasSelectedField}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'white',
-                color: 'var(--text-primary)',
-              }}
+              style={getControlButtonStyle(hasSelectedField)}
             >
               Ниже ↓
             </button>
             <button
               onClick={alignSelectedRow}
-              disabled={!selectedField || selectedRowFieldCount <= 1}
+              disabled={!canAlignRow}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'white',
-                color: 'var(--text-primary)',
-              }}
+              style={getControlButtonStyle(canAlignRow, true)}
             >
               Вся строка
             </button>
             <button
               onClick={alignSelectedColumn}
-              disabled={!selectedField || selectedColumnFieldCount <= 1}
+              disabled={!canAlignColumn}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'white',
-                color: 'var(--text-primary)',
-              }}
+              style={getControlButtonStyle(canAlignColumn, true)}
             >
               Весь столбец
             </button>
             <button
               onClick={resetSelected}
-              disabled={!selectedField}
+              disabled={!hasSelectedField}
               className="rounded-lg px-3 py-2 text-xs font-medium"
-              style={{
-                border: '1px solid var(--border)',
-                backgroundColor: 'transparent',
-                color: 'var(--text-muted)',
-              }}
+              style={getControlButtonStyle(hasSelectedField)}
             >
               Сбросить поле
             </button>
