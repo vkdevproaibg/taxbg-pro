@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { fillVisaForm, TEST_FORM_DATA } from '../../lib/visaFormFiller'
-import type { VisaFormData } from '../../lib/visaFormFiller'
+import type { VisaFormData, VisaPdfOverrides } from '../../lib/visaFormFiller'
+import VisaPdfCorrectionPreview from './VisaPdfCorrectionPreview'
 
 // ── Types ────────────────────────────────────────────────
 type FormData = VisaFormData
@@ -161,12 +162,27 @@ export default function StartupFormTab() {
     }
   })
   const [showInstructions, setShowInstructions] = useState(true)
+  const [showPdfCorrection, setShowPdfCorrection] = useState(false)
+  const [pdfOverrides, setPdfOverrides] = useState<VisaPdfOverrides>(() => {
+    try {
+      const saved = localStorage.getItem('startupVisaPdfOverrides')
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
 
   useEffect(() => {
     try {
       localStorage.setItem('startupVisaForm', JSON.stringify(form))
     } catch {}
   }, [form])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('startupVisaPdfOverrides', JSON.stringify(pdfOverrides))
+    } catch {}
+  }, [pdfOverrides])
 
   // Flat string field handler
   const handle = (field: StringField) =>
@@ -1009,7 +1025,7 @@ export default function StartupFormTab() {
           <button
             onClick={async () => {
               try {
-                await fillVisaForm(form)
+                await fillVisaForm(form, pdfOverrides)
               } catch (err) {
                 alert('Ошибка: ' + (err as Error).message)
               }
@@ -1021,7 +1037,7 @@ export default function StartupFormTab() {
           <button
             onClick={async () => {
               try {
-                await fillVisaForm(TEST_FORM_DATA)
+                await fillVisaForm(TEST_FORM_DATA, { offsets: pdfOverrides.offsets })
               } catch (err) {
                 alert('Ошибка теста: ' + (err as Error).message)
               }
@@ -1045,10 +1061,22 @@ export default function StartupFormTab() {
             📄 Пустой бланк
           </a>
           <button
+            onClick={() => setShowPdfCorrection(v => !v)}
+            className="rounded-xl px-4 py-2 text-xs font-medium"
+            style={{
+              border: '1.5px solid var(--accent)',
+              color: 'var(--accent-text)',
+              backgroundColor: 'var(--accent-light)',
+            }}>
+            {showPdfCorrection ? '✕ Скрыть точную корректировку' : '✍ Точная корректировка PDF'}
+          </button>
+          <button
             onClick={() => {
               if (confirm('Очистить все введённые данные?')) {
                 setForm(EMPTY)
                 localStorage.removeItem('startupVisaForm')
+                setPdfOverrides({})
+                localStorage.removeItem('startupVisaPdfOverrides')
               }
             }}
             className="rounded-xl px-4 py-2 text-xs font-medium"
@@ -1066,6 +1094,14 @@ export default function StartupFormTab() {
           в 3 местах перед подачей.
         </p>
       </div>
+
+      {showPdfCorrection && (
+        <VisaPdfCorrectionPreview
+          form={form}
+          overrides={pdfOverrides}
+          setOverrides={setPdfOverrides}
+        />
+      )}
 
       {/* Common mistakes */}
       <div>

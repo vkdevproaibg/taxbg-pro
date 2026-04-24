@@ -75,7 +75,12 @@ export interface VisaFormData {
 // Coordinates measured from official MFA blank
 // Page size: 595.3 x 841.9 pts (A4)
 // [x, y_from_bottom, maxWidth, pageIndex]
-const FIELDS: Record<string, [number, number, number, number]> = {
+export const VISA_PAGE_SIZE = {
+  width: 595.32,
+  height: 841.92,
+} as const
+
+export const FIELDS = {
   // PAGE 1
   f1_surname:          [145, 570, 270, 0],
   f2_formerSurname:    [145, 547, 270, 0],
@@ -141,10 +146,10 @@ const FIELDS: Record<string, [number, number, number, number]> = {
   f33_details:         [ 51,  84, 490, 2],
   // PAGE 4
   f34_details:         [ 51, 732, 490, 3],
-}
+} as const satisfies Record<string, readonly [number, number, number, number]>
 
 // Checkbox positions [x, y_from_bottom, pageIndex]
-const CHECKBOXES: Record<string, [number, number, number]> = {
+export const CHECKBOXES = {
   gender_M:        [ 51, 285, 0],
   gender_F:        [ 51, 271, 0],
   passport_civil:  [ 51, 155, 0],
@@ -189,9 +194,179 @@ const CHECKBOXES: Record<string, [number, number, number]> = {
   fin_card:        [ 51, 551, 3],
   fin_accom:       [ 51, 537, 3],
   fin_transport:   [ 51, 523, 3],
+} as const satisfies Record<string, readonly [number, number, number]>
+
+export type VisaFieldKey = keyof typeof FIELDS
+export type VisaCheckboxKey = keyof typeof CHECKBOXES
+
+export interface VisaPdfFieldOffset {
+  dx: number
+  dy: number
 }
 
-export async function fillVisaForm(form: VisaFormData): Promise<void> {
+export interface VisaPdfOverrides {
+  text?: Partial<Record<VisaFieldKey, string>>
+  offsets?: Partial<Record<VisaFieldKey, VisaPdfFieldOffset>>
+}
+
+export function buildVisaFieldValues(
+  form: VisaFormData,
+): Partial<Record<VisaFieldKey, string>> {
+  const values: Partial<Record<VisaFieldKey, string>> = {
+    f1_surname: form.lastName,
+    f2_formerSurname: form.formerLastName,
+    f3_firstName: form.firstName,
+    f4_birthDate: form.birthDate,
+    f5_birthPlace: form.birthPlace,
+    f6_birthCountry: form.birthCountry,
+    f7_nationality: form.nationality,
+    f7_natAtBirth: form.nationalityAtBirth,
+    f7_otherNat: form.otherNationality,
+    f8_prevNat: form.previousNationalities,
+    f10_address: form.homeAddress,
+    f10_email: form.email,
+    f10_phone: form.phone,
+    f12_passportNum: form.passportNumber,
+    f13_issueDate: form.passportIssueDate,
+    f14_expiry: form.passportExpiry,
+    f15_issuedBy: form.passportIssuedBy,
+    f16_nationalId: form.nationalId,
+    f18_spouseLastName: form.spouse.lastName,
+    f18_spouseFormerName: form.spouse.formerLastName,
+    f18_spouseFirstName: form.spouse.firstName,
+    f18_spouseBirth: form.spouse.birthDate,
+    f18_spouseNat: form.spouse.nationality,
+    f18_spouseFormerNat: form.spouse.formerNationality,
+    f18_spouseAddress: form.spouse.address,
+    f22_arrival: form.arrivalDate || form.dateFrom,
+    f25_from: form.dateFrom,
+    f25_to: form.dateTo,
+    f26_address: [form.bulgAddressCity, form.bulgAddressStreet]
+      .filter(Boolean)
+      .join(', '),
+    f29_profession: form.occupation,
+    f30_employer: [form.employer, form.employerAddress]
+      .filter(Boolean)
+      .join(', '),
+    f31_other: form.otherPurposeInfo,
+  }
+
+  const kids = form.children
+  if (kids[0]) {
+    values.f19_child1_name = kids[0].lastName
+    values.f19_child1_firstName = kids[0].firstName
+    values.f19_child1_birth =
+      [kids[0].birthDate, kids[0].birthPlace].filter(Boolean).join(' / ')
+    values.f19_child1_nat = kids[0].nationality
+    values.f19_child1_addr = kids[0].address
+  }
+  if (kids[1]) {
+    values.f19_child2_name = kids[1].lastName
+    values.f19_child2_firstName = kids[1].firstName
+    values.f19_child2_birth =
+      [kids[1].birthDate, kids[1].birthPlace].filter(Boolean).join(' / ')
+    values.f19_child2_nat = kids[1].nationality
+    values.f19_child2_addr = kids[1].address
+  }
+
+  if (form.purposeCategory === 'other') {
+    values.f21_purposeOther = form.purpose
+  }
+  if (form.thirdCountryResidence === 'yes') {
+    values.f24_permitNum = form.thirdCountryPermitNum
+    values.f24_permitExpiry = form.thirdCountryPermitExpiry
+    values.f24_stayFrom = form.thirdCountryStayFrom
+    values.f24_stayTo = form.thirdCountryStayTo
+  }
+  if (form.liveOutsideBulgaria === 'yes') {
+    values.f27_details = form.liveOutsideBulgaria
+  }
+  if (form.familyTraveling === 'yes') {
+    values.f28_details = form.familyTravelingDetails
+  }
+  if (form.previousVisaRefused === 'yes') {
+    values.f32_details = form.previousVisaRefusedDetails
+  }
+  if (form.hasCriminalRecord === 'yes') {
+    values.f33_details = form.criminalRecordDetails
+  }
+  if (form.wasDeported === 'yes') {
+    values.f34_details = form.deportedDetails
+  }
+  if (form.visitedBulgariaBefore === 'yes') {
+    form.bulgariaVisits.forEach((visit, index) => {
+      const n = index + 1 as 1 | 2 | 3
+      values[`f23_visit${n}_from` as VisaFieldKey] = visit.dateFrom
+      values[`f23_visit${n}_to` as VisaFieldKey] = visit.dateTo
+      values[`f23_visit${n}_place` as VisaFieldKey] = visit.place
+    })
+  }
+
+  return values
+}
+
+export function buildVisaCheckedBoxes(form: VisaFormData): VisaCheckboxKey[] {
+  const checked: VisaCheckboxKey[] = []
+
+  if (form.gender === 'M') checked.push('gender_M')
+  if (form.gender === 'F') checked.push('gender_F')
+
+  const pt = form.passportType
+  if (pt.includes('Общегражд')) checked.push('passport_civil')
+  else if (pt.includes('Диплом')) checked.push('passport_diplo')
+  else if (pt.includes('Служеб')) checked.push('passport_service')
+  else checked.push('passport_other')
+
+  const ms = form.maritalStatus
+  if (ms.includes('Холост')) checked.push('marital_single')
+  else if (ms.includes('Женат')) checked.push('marital_married')
+  else if (ms.includes('партнёр')) checked.push('marital_partner')
+  else if (ms.includes('отдельно')) checked.push('marital_sep')
+  else if (ms.includes('Разведён')) checked.push('marital_div')
+  else if (ms.includes('Вдов')) checked.push('marital_widow')
+
+  const pc = form.purposeCategory
+  if (pc === 'work') checked.push('purpose_work')
+  else if (pc === 'family') checked.push('purpose_family')
+  else if (pc === 'culture') checked.push('purpose_culture')
+  else if (pc === 'sport') checked.push('purpose_sport')
+  else if (pc === 'medical') checked.push('purpose_medical')
+  else if (pc === 'study') checked.push('purpose_study')
+  else if (pc === 'pension') checked.push('purpose_pension')
+  else checked.push('purpose_other')
+
+  checked.push(
+    form.visitedBulgariaBefore === 'yes' ? 'visited_yes' : 'visited_no',
+    form.thirdCountryResidence === 'yes' ? 'third_yes' : 'third_no',
+    form.liveOutsideBulgaria === 'yes' ? 'outside_yes' : 'outside_no',
+    form.familyTraveling === 'yes' ? 'family_yes' : 'family_no',
+    form.previousVisaRefused === 'yes' ? 'refused_yes' : 'refused_no',
+    form.hasCriminalRecord === 'yes' ? 'criminal_yes' : 'criminal_no',
+    form.wasDeported === 'yes' ? 'deported_yes' : 'deported_no',
+    form.hasInfectiousDisease === 'yes' ? 'disease_yes' : 'disease_no',
+  )
+
+  if (form.financialMeans === 'self') {
+    checked.push('fin_self')
+    const types = form.financialMeansType || []
+    if (types.includes('cash')) checked.push('fin_cash')
+    if (types.includes('travcheck')) checked.push('fin_travcheck')
+    if (types.includes('card')) checked.push('fin_card')
+    if (types.includes('accom')) checked.push('fin_accom')
+    if (types.includes('transport')) checked.push('fin_transport')
+  } else if (form.financialMeans === 'sponsor') {
+    checked.push('fin_sponsor')
+  } else if (form.financialMeans === 'employer') {
+    checked.push('fin_employer')
+  }
+
+  return checked
+}
+
+export async function fillVisaForm(
+  form: VisaFormData,
+  overrides: VisaPdfOverrides = {},
+): Promise<void> {
   const response = await fetch('/visa_d_blank.pdf')
   if (!response.ok) throw new Error(
     'Не удалось загрузить бланк. Убедитесь что public/visa_d_blank.pdf существует.'
@@ -202,23 +377,34 @@ export async function fillVisaForm(form: VisaFormData): Promise<void> {
   const pages = pdfDoc.getPages()
   const INK = rgb(0, 0, 0.55) // dark blue — typed text appearance
   const SZ = 8.5
+  const values = buildVisaFieldValues(form)
+  const textOverrides = overrides.text ?? {}
+  const offsetOverrides = overrides.offsets ?? {}
+  const hasTextOverride = (key: VisaFieldKey) =>
+    Object.prototype.hasOwnProperty.call(textOverrides, key)
 
   // Draw text at field position, auto-shrinking font to fit maxWidth
-  const put = (key: string, value: string) => {
-    if (!value?.trim()) return
+  const put = (key: VisaFieldKey) => {
+    const value = hasTextOverride(key) ? textOverrides[key] ?? '' : values[key] ?? ''
+    if (!value.trim()) return
     const c = FIELDS[key]
-    if (!c) return
     const [x, y, maxW, pg] = c
     const page = pages[pg]
     if (!page) return
+    const offset = offsetOverrides[key]
     const fitted = fitTextToWidth(value.trim(), font, SZ, maxW)
-    page.drawText(fitted.text, { x, y, size: fitted.fontSize, font, color: INK })
+    page.drawText(fitted.text, {
+      x: x + (offset?.dx ?? 0),
+      y: y - (offset?.dy ?? 0),
+      size: fitted.fontSize,
+      font,
+      color: INK,
+    })
   }
 
   // Mark checkbox with X
-  const check = (key: string) => {
+  const check = (key: VisaCheckboxKey) => {
     const c = CHECKBOXES[key]
-    if (!c) return
     const [x, y, pg] = c
     pages[pg]?.drawText('X', {
       x: x + 1, y: y + 1,
@@ -227,186 +413,11 @@ export async function fillVisaForm(form: VisaFormData): Promise<void> {
     })
   }
 
-  // ── PAGE 1 ────────────────────────────────────────────────
-  put('f1_surname',       form.lastName)
-  put('f2_formerSurname', form.formerLastName)
-  put('f3_firstName',     form.firstName)
-  put('f4_birthDate',     form.birthDate)
-  put('f5_birthPlace',    form.birthPlace)
-  put('f6_birthCountry',  form.birthCountry)
-  put('f7_nationality',   form.nationality)
-  put('f7_natAtBirth',    form.nationalityAtBirth)
-  put('f7_otherNat',      form.otherNationality)
-  put('f8_prevNat',       form.previousNationalities)
-  put('f10_address',      form.homeAddress)
-  put('f10_email',        form.email)
-  put('f10_phone',        form.phone)
-
-  // Field 9 gender
-  if (form.gender === 'M') check('gender_M')
-  if (form.gender === 'F') check('gender_F')
-
-  // Field 11 passport type
-  const pt = form.passportType
-  if      (pt.includes('Общегражд')) check('passport_civil')
-  else if (pt.includes('Диплом'))    check('passport_diplo')
-  else if (pt.includes('Служеб'))    check('passport_service')
-  else                               check('passport_other')
-
-  put('f12_passportNum', form.passportNumber)
-  put('f13_issueDate',   form.passportIssueDate)
-  put('f14_expiry',      form.passportExpiry)
-  put('f15_issuedBy',    form.passportIssuedBy)
-
-  // ── PAGE 2 ────────────────────────────────────────────────
-  put('f16_nationalId', form.nationalId)
-
-  // Field 17 marital status
-  const ms = form.maritalStatus
-  if      (ms.includes('Холост'))        check('marital_single')
-  else if (ms.includes('Женат'))         check('marital_married')
-  else if (ms.includes('партнёр'))       check('marital_partner')
-  else if (ms.includes('отдельно'))      check('marital_sep')
-  else if (ms.includes('Разведён'))      check('marital_div')
-  else if (ms.includes('Вдов'))          check('marital_widow')
-
-  // Field 18 spouse
-  const sp = form.spouse
-  put('f18_spouseLastName',   sp.lastName)
-  put('f18_spouseFormerName', sp.formerLastName)
-  put('f18_spouseFirstName',  sp.firstName)
-  put('f18_spouseBirth',      sp.birthDate)
-  put('f18_spouseNat',        sp.nationality)
-  put('f18_spouseFormerNat',  sp.formerNationality)
-  put('f18_spouseAddress',    sp.address)
-
-  // Field 19 children (up to 2 rows on the form)
-  const kids = form.children
-  if (kids[0]) {
-    put('f19_child1_name',      kids[0].lastName)
-    put('f19_child1_firstName', kids[0].firstName)
-    put('f19_child1_birth',
-        [kids[0].birthDate, kids[0].birthPlace].filter(Boolean).join(' / '))
-    put('f19_child1_nat',  kids[0].nationality)
-    put('f19_child1_addr', kids[0].address)
+  for (const key of Object.keys(values) as VisaFieldKey[]) {
+    put(key)
   }
-  if (kids[1]) {
-    put('f19_child2_name',      kids[1].lastName)
-    put('f19_child2_firstName', kids[1].firstName)
-    put('f19_child2_birth',
-        [kids[1].birthDate, kids[1].birthPlace].filter(Boolean).join(' / '))
-    put('f19_child2_nat',  kids[1].nationality)
-    put('f19_child2_addr', kids[1].address)
-  }
-
-  // Field 21 purpose checkboxes
-  const pc = form.purposeCategory
-  if      (pc === 'work')    check('purpose_work')
-  else if (pc === 'family')  check('purpose_family')
-  else if (pc === 'culture') check('purpose_culture')
-  else if (pc === 'sport')   check('purpose_sport')
-  else if (pc === 'medical') check('purpose_medical')
-  else if (pc === 'study')   check('purpose_study')
-  else if (pc === 'pension') check('purpose_pension')
-  else { check('purpose_other'); put('f21_purposeOther', form.purpose) }
-
-  put('f22_arrival', form.arrivalDate || form.dateFrom)
-
-  // ── PAGE 3 ────────────────────────────────────────────────
-  // Field 23 visited Bulgaria before
-  if (form.visitedBulgariaBefore === 'yes') {
-    check('visited_yes')
-    form.bulgariaVisits.forEach((v, i) => {
-      put(`f23_visit${i + 1}_from`,  v.dateFrom)
-      put(`f23_visit${i + 1}_to`,    v.dateTo)
-      put(`f23_visit${i + 1}_place`, v.place)
-    })
-  } else {
-    check('visited_no')
-  }
-
-  // Field 24 third country residence
-  if (form.thirdCountryResidence === 'yes') {
-    check('third_yes')
-    put('f24_permitNum',    form.thirdCountryPermitNum)
-    put('f24_permitExpiry', form.thirdCountryPermitExpiry)
-    put('f24_stayFrom',     form.thirdCountryStayFrom)
-    put('f24_stayTo',       form.thirdCountryStayTo)
-  } else {
-    check('third_no')
-  }
-
-  // Fields 25-26
-  put('f25_from',    form.dateFrom)
-  put('f25_to',      form.dateTo)
-  put('f26_address',
-      [form.bulgAddressCity, form.bulgAddressStreet].filter(Boolean).join(', '))
-
-  // Field 27
-  if (form.liveOutsideBulgaria === 'yes') {
-    check('outside_yes')
-    put('f27_details', form.liveOutsideBulgaria)
-  } else {
-    check('outside_no')
-  }
-
-  // Field 28
-  if (form.familyTraveling === 'yes') {
-    check('family_yes')
-    put('f28_details', form.familyTravelingDetails)
-  } else {
-    check('family_no')
-  }
-
-  // Fields 29-31
-  put('f29_profession', form.occupation)
-  put('f30_employer',
-      [form.employer, form.employerAddress].filter(Boolean).join(', '))
-  put('f31_other', form.otherPurposeInfo)
-
-  // Field 32
-  if (form.previousVisaRefused === 'yes') {
-    check('refused_yes')
-    put('f32_details', form.previousVisaRefusedDetails)
-  } else {
-    check('refused_no')
-  }
-
-  // Field 33
-  if (form.hasCriminalRecord === 'yes') {
-    check('criminal_yes')
-    put('f33_details', form.criminalRecordDetails)
-  } else {
-    check('criminal_no')
-  }
-
-  // ── PAGE 4 ────────────────────────────────────────────────
-  // Field 34
-  if (form.wasDeported === 'yes') {
-    check('deported_yes')
-    put('f34_details', form.deportedDetails)
-  } else {
-    check('deported_no')
-  }
-
-  // Field 35
-  if (form.hasInfectiousDisease === 'yes') check('disease_yes')
-  else check('disease_no')
-
-  // Field 36 financial means
-  const fin = form.financialMeans
-  if (fin === 'self') {
-    check('fin_self')
-    const types = form.financialMeansType || []
-    if (types.includes('cash'))      check('fin_cash')
-    if (types.includes('travcheck')) check('fin_travcheck')
-    if (types.includes('card'))      check('fin_card')
-    if (types.includes('accom'))     check('fin_accom')
-    if (types.includes('transport')) check('fin_transport')
-  } else if (fin === 'sponsor') {
-    check('fin_sponsor')
-  } else if (fin === 'employer') {
-    check('fin_employer')
+  for (const key of buildVisaCheckedBoxes(form)) {
+    check(key)
   }
 
   // ── Download ──────────────────────────────────────────────
