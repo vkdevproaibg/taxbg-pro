@@ -1,11 +1,12 @@
-import { NavLink } from 'react-router-dom'
+import { useEffect } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, ShieldCheck, Building2,
   BookOpen, Store, Calculator, FileText,
   Wallet, Users,
   CalendarDays,
   Scale, Bot, Layers, Shield, Archive,
-  Eye, BarChart3,
+  Eye, BarChart3, X,
 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import type { TranslationKey } from '../../lib/useT'
@@ -15,6 +16,7 @@ import NavStatusDot from '../ui/NavStatusDot'
 import type { NavStatus } from '../../lib/navStatus'
 import { useUserStore } from '../../store/userStore'
 import { useCompaniesStore } from '../../store/companiesStore'
+import { useSidebarStore } from '../../store/sidebarStore'
 
 type NavItem = {
   to: string
@@ -70,7 +72,6 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ]
 
-// Routes visible in owner mode sidebar. All other routes stay accessible via URL.
 const OWNER_VISIBLE_ROUTES: ReadonlySet<string> = new Set([
   '/',
   '/companies',
@@ -109,12 +110,17 @@ const TOGGLE_LABELS = {
 } as const
 
 export default function Sidebar() {
-  const t         = useT()
-  const navStatus = useNavStatus()
-  const viewMode  = useUserStore((s) => s.viewMode)
-  const setViewMode = useUserStore((s) => s.setViewMode)
-  const language  = useUserStore((s) => s.language)
+  const t            = useT()
+  const navStatus    = useNavStatus()
+  const viewMode     = useUserStore((s) => s.viewMode)
+  const setViewMode  = useUserStore((s) => s.setViewMode)
+  const language     = useUserStore((s) => s.language)
   const companiesCount = useCompaniesStore((s) => s.companies.length)
+  const { isOpen, close } = useSidebarStore()
+  const location = useLocation()
+
+  // Close drawer on navigation (mobile)
+  useEffect(() => { close() }, [location.pathname, close])
 
   const isOwner = viewMode === 'owner'
 
@@ -135,9 +141,42 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="flex h-full w-56 flex-col overflow-hidden"
+      className={[
+        // Mobile: fixed drawer sliding from left
+        'fixed inset-y-0 left-0 z-50 flex w-72 flex-col overflow-hidden',
+        'transition-transform duration-300 ease-in-out',
+        // Desktop: static sidebar in flex row
+        'md:relative md:inset-auto md:z-auto md:w-56 md:translate-x-0',
+        isOpen ? 'translate-x-0' : '-translate-x-full',
+      ].join(' ')}
       style={{ backgroundColor: 'var(--surface-sidebar)' }}
     >
+      {/* Mobile drawer header with close button */}
+      <div
+        className="flex shrink-0 items-center justify-between px-4 py-3 md:hidden"
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
+        <div className="flex items-center gap-2">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold text-white"
+            style={{ backgroundColor: 'var(--accent)' }}
+          >
+            🌹
+          </div>
+          <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+            TaxBG{' '}
+            <span style={{ color: 'var(--accent)' }}>Pro</span>
+          </span>
+        </div>
+        <button
+          onClick={close}
+          className="rounded-lg p-2 transition-colors hover:bg-[--surface]"
+          style={{ color: 'var(--text-muted)' }}
+          aria-label="Закрыть меню"
+        >
+          <X size={18} />
+        </button>
+      </div>
 
       <CompanySwitcher />
 
@@ -163,7 +202,7 @@ export default function Sidebar() {
                     to={to}
                     end={to === '/'}
                     className={({ isActive }) =>
-                      `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+                      `flex items-center gap-2.5 rounded-lg px-3 py-2.5 md:py-2 text-sm transition-colors ${
                         isActive ? 'font-medium' : ''
                       }`
                     }
@@ -196,7 +235,7 @@ export default function Sidebar() {
       <div className="border-t px-2 py-2" style={{ borderColor: 'var(--border)' }}>
         <button
           onClick={() => setViewMode(isOwner ? 'accountant' : 'owner')}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs transition-colors hover:bg-[--surface]"
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 md:py-2 text-xs transition-colors hover:bg-[--surface]"
           style={{ color: 'var(--text-secondary)' }}
           title={toggleLabel}
         >
@@ -204,7 +243,6 @@ export default function Sidebar() {
           <span className="truncate">{toggleLabel}</span>
         </button>
       </div>
-
     </aside>
   )
 }

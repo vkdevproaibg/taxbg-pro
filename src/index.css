@@ -122,10 +122,21 @@ body {
   box-shadow: inset -1px 0 0 rgba(214, 38, 18, 0.12);
 }
 
+/* iOS PWA: respect the home indicator and notch */
+:root {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
 * {
   transition-property: color, background-color, border-color;
   transition-duration: 150ms;
   transition-timing-function: ease;
+}
+
+/* Tap highlight suppression for mobile */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
 }
 
 ::-webkit-scrollbar { width: 6px; }

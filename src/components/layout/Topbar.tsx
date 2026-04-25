@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
-import { Eye, Calculator as CalcIcon } from 'lucide-react'
+import { Eye, Calculator as CalcIcon, Menu } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useUserStore } from '../../store/userStore'
+import { useSidebarStore } from '../../store/sidebarStore'
 import NotificationBell from '../ui/NotificationBell'
 
 const VIEW_MODE_LABELS = {
@@ -80,11 +81,22 @@ function UserMenu() {
 
 export default function Topbar() {
   const companyName = useUserStore((s) => s.companyName)
+  const toggle = useSidebarStore((s) => s.toggle)
 
   return (
     <header className="sticky top-0 z-20 border-b border-[--border] bg-[--surface-card]/95 backdrop-blur-sm">
-      <div className="flex items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-4 md:px-6 py-3">
+        <div className="flex items-center gap-2 md:gap-3">
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={toggle}
+            className="flex items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-[--surface] md:hidden"
+            style={{ color: 'var(--text-muted)' }}
+            aria-label="Открыть меню"
+          >
+            <Menu size={20} />
+          </button>
+
           <div className="flex items-center gap-2.5">
             <div
               className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold text-white shadow-sm"
@@ -103,7 +115,7 @@ export default function Topbar() {
           </div>
 
           {companyName && (
-            <span className="ml-2 border-l border-[--border] pl-3 text-sm font-medium text-[--text-primary]">
+            <span className="ml-2 hidden sm:inline border-l border-[--border] pl-3 text-sm font-medium text-[--text-primary] truncate max-w-[140px]">
               {companyName}
             </span>
           )}
