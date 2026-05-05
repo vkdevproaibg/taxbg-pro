@@ -112,7 +112,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Clear all other stores
         try {
           const { useCompaniesStore } = await import('./companiesStore')
-          const cs = useCompaniesStore.getState() as Record<string, unknown>
+          const cs = useCompaniesStore.getState() as unknown as Record<string, unknown>
           if (typeof cs['reset'] === 'function') (cs['reset'] as () => void)()
         } catch { /* non-fatal */ }
         return
