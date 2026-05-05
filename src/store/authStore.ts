@@ -112,7 +112,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Clear all other stores
         try {
           const { useCompaniesStore } = await import('./companiesStore')
-          useCompaniesStore.getState().reset?.()
+          const cs = useCompaniesStore.getState() as Record<string, unknown>
+          if (typeof cs['reset'] === 'function') (cs['reset'] as () => void)()
         } catch { /* non-fatal */ }
         return
       }
@@ -173,10 +174,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   resetPassword: async (email) => {
     if (!supabase) return 'Supabase не настроен'
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + '/update-password',
-    })
-    if (error) return error.message
+    // Note: redirectTo must be listed in Supabase → Authentication → URL Configuration
+    // → Redirect URLs. If not set, Supabase uses the Site URL.
+    // PASSWORD_RECOVERY event in onAuthStateChange handles the redirect to /update-password.
+    const redirectTo = window.location.origin + '/update-password'
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    if (error) {
+      // "Error sending recovery email" often means the redirectTo URL is not
+      // whitelisted in Supabase → Authentication → URL Configuration → Redirect URLs.
+      // Fall back to a request without redirectTo so the default Site URL is used.
+      if (error.message.toLowerCase().includes('sending recovery')) {
+        const { error: error2 } = await supabase.auth.resetPasswordForEmail(email)
+        if (error2) return error2.message
+      } else {
+        return error.message
+      }
+    }
     logAuthEvent('auth_password_reset_requested', { email })
     return null
   },

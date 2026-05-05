@@ -89,7 +89,9 @@ const UI = {
   },
 } as const
 
-function translateError(msg: string, t: typeof UI['ru']): { text: string; notConfirmed: boolean } {
+type UIStrings = typeof UI[keyof typeof UI]
+
+function translateError(msg: string, t: UIStrings): { text: string; notConfirmed: boolean } {
   const low = msg.toLowerCase()
   if (low.includes('invalid') || low.includes('credentials') || low.includes('wrong password')) {
     return { text: t.errInvalid, notConfirmed: false }

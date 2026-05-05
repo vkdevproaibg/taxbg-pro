@@ -125,7 +125,9 @@ function detectLanguage(): AppLanguage {
   return 'ru'
 }
 
-function translateError(msg: string, t: typeof UI['ru']): string {
+type UIStrings = typeof UI[keyof typeof UI]
+
+function translateError(msg: string, t: UIStrings): string {
   if (msg.includes('already registered') || msg.includes('already exists')) return t.errEmailTaken
   if (msg.includes('network') || msg.includes('fetch')) return t.errNetwork
   return t.errGeneric
