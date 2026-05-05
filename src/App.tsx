@@ -17,6 +17,11 @@ import Accounting from './pages/Accounting'
 import Assistant from './pages/Assistant'
 import Auditor from './pages/Auditor'
 import Auth from './pages/Auth'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import ResetPassword from './pages/ResetPassword'
+import UpdatePassword from './pages/UpdatePassword'
+import AuthCallback from './pages/AuthCallback'
 import Calculator from './pages/Calculator'
 import Calendar from './pages/Calendar'
 import Dashboard from './pages/Dashboard'
@@ -40,6 +45,30 @@ import { useNotificationsStore } from './store/notificationsStore'
 import { ensureCapitalEntry } from './lib/journalAI'
 import { initAnalytics, trackPageView } from './lib/analytics'
 import { runHealthCheck } from './lib/healthCheck'
+
+// ---------------------------------------------------------------------------
+// Protected route — redirects to /login when not authenticated
+// ---------------------------------------------------------------------------
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore((s) => !!s.user)
+  const isLoading       = useAuthStore((s) => s.isLoading)
+  const isDemo          = useAuthStore((s) => s.isDemo)
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: 'var(--surface)' }}>
+        <div className="text-center space-y-3">
+          <p className="text-2xl">🌿</p>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>TaxBG Pro загружается…</p>
+        </div>
+      </div>
+    )
+  }
+  // Allow demo mode (Supabase not configured) to pass through
+  if (!isDemo && !isAuthenticated) return <Navigate to="/login" replace />
+  return <>{children}</>
+}
 
 function App() {
   const { initialize, isLoading, isDemo } = useAuthStore()
@@ -146,14 +175,22 @@ function App() {
         </div>
       )}
     <Routes>
+      {/* Public routes */}
       <Route path="/auth" element={<Auth />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/update-password" element={<UpdatePassword />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/ai-disclosure" element={<AIDisclosure />} />
+      {/* Protected routes */}
       <Route path="/*" element={
-        <Layout>
-          <DemoBanner />
-          <Routes>
+        <ProtectedRoute>
+          <Layout>
+            <DemoBanner />
+            <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/auditor" element={<Auditor />} />
@@ -181,6 +218,7 @@ function App() {
           </Routes>
           <TourOverlay />
         </Layout>
+        </ProtectedRoute>
       } />
     </Routes>
     </>

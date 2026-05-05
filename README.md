@@ -50,3 +50,34 @@ npm run preview  # preview production build locally
 - The app works in **demo mode** without Supabase credentials (all data stored in localStorage)
 - AI features require an OpenRouter API key configured per-user in Settings
 - Supabase migrations are  in `supabase/migrations/` — run via Supabase CLI or dashboard
+
+## Google OAuth Setup
+
+To enable "Sign in with Google":
+
+### 1. Google Cloud Console
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create or select a project
+3. **APIs & Services → OAuth consent screen** → configure app name, email, scopes (`email`, `profile`, `openid`)
+4. **APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID**
+   - Application type: **Web application**
+   - Authorized JavaScript origins: `https://your-supabase-project.supabase.co`
+   - Authorized redirect URIs:
+     - `https://your-supabase-project.supabase.co/auth/v1/callback`
+     - `http://localhost:5173` (for local dev)
+5. Copy **Client ID** and **Client secret**
+
+### 2. Supabase Dashboard
+
+1. Go to **Authentication → Providers → Google**
+2. Toggle **Enable Sign in with Google**
+3. Paste **Client ID** and **Client secret** from step above
+4. Save
+
+### 3. App redirect URL
+
+The app already sends `redirectTo: window.location.origin + '/auth/callback'`.
+Make sure `window.location.origin` (e.g. `https://taxbgpro.com`) is added to:
+- Supabase **Authentication → URL Configuration → Redirect URLs**
+- Google Cloud Console **Authorized redirect URIs** (indirectly, via the Supabase callback)

@@ -16,6 +16,25 @@ interface Profile {
   full_name: string | null
 }
 
+// ---------------------------------------------------------------------------
+// Audit logging helper — non-fatal, fire-and-forget
+// ---------------------------------------------------------------------------
+async function logAuthEvent(
+  action: string,
+  meta: Record<string, unknown> = {},
+) {
+  if (!supabase) return
+  try {
+    const user = useAuthStore.getState().user
+    await supabase.from('audit_events').insert({
+      actor_profile_id: user?.id ?? null,
+      entity_type: 'auth',
+      action,
+      after_json: { email: user?.email ?? meta.email ?? null, ...meta },
+    })
+  } catch { /* non-fatal */ }
+}
+
 interface AuthState {
   session:     Session | null
   user:        User | null
@@ -27,7 +46,11 @@ interface AuthState {
   initialize:  () => Promise<void>
   signIn:      (email: string, password: string) => Promise<string | null>
   signUp:      (email: string, password: string, language?: string) => Promise<string | null>
+  signInWithGoogle: () => Promise<string | null>
   signOut:     () => Promise<void>
+  resetPassword: (email: string) => Promise<string | null>
+  updatePassword: (newPassword: string) => Promise<string | null>
+  resendConfirmation: (email: string) => Promise<string | null>
   fetchProfile: () => Promise<void>
   refreshPendingTransfers: () => Promise<void>
   dismissPendingTransfer: (id: string) => void
@@ -69,7 +92,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: false })
 
     // Listen for auth changes
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Handled by UpdatePassword page — just store session
+        if (session) set({ session, user: session.user, isDemo: false })
+        return
+      }
+      if (event === 'TOKEN_REFRESHED' && session) {
+        set({ session })
+        return
+      }
+      if (event === 'SIGNED_IN' && session) {
+        set({ session, user: session.user, isDemo: false })
+        await get().fetchProfile()
+        return
+      }
+      if (event === 'SIGNED_OUT') {
+        set({ session: null, user: null, profile: null, isDemo: true })
+        // Clear all other stores
+        try {
+          const { useCompaniesStore } = await import('./companiesStore')
+          useCompaniesStore.getState().reset?.()
+        } catch { /* non-fatal */ }
+        return
+      }
+      // Fallback: keep existing behaviour
       if (session) {
         set({ session, user: session.user, isDemo: false })
         await get().fetchProfile()
@@ -81,12 +128,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signIn: async (email, password) => {
     if (!supabase) return 'Supabase не настроен'
-    const { error } = await supabase.auth.signInWithPassword({
-      email, password
-    })
-    // Don't set isLoading: false here —
-    // onAuthStateChange → fetchProfile will do it
-    return error ? error.message : null
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      logAuthEvent('auth_sign_in_failed', {
+        email,
+        reason: error.message.includes('confirm') ? 'email_not_confirmed' : 'invalid_credentials',
+      })
+      return error.message
+    }
+    logAuthEvent('auth_sign_in', { email, provider: 'email' })
+    return null
   },
 
   signUp: async (email, password, language = 'ru') => {
@@ -95,18 +146,54 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { language }
-      }
+      options: { data: { language } },
     })
     set({ isLoading: false })
+    if (error) return error.message
+    logAuthEvent('auth_sign_up', { email, provider: 'email' })
+    return null
+  },
+
+  signInWithGoogle: async () => {
+    if (!supabase) return 'Supabase не настроен'
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + '/auth/callback' },
+    })
     return error ? error.message : null
   },
 
   signOut: async () => {
     if (!supabase) return
-    await supabase.auth.signOut()
+    const email = useAuthStore.getState().user?.email
+    await supabase.auth.signOut({ scope: 'global' })
+    if (email) logAuthEvent('auth_sign_out', { email })
     set({ session: null, user: null, profile: null, isDemo: true })
+  },
+
+  resetPassword: async (email) => {
+    if (!supabase) return 'Supabase не настроен'
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/update-password',
+    })
+    if (error) return error.message
+    logAuthEvent('auth_password_reset_requested', { email })
+    return null
+  },
+
+  updatePassword: async (newPassword) => {
+    if (!supabase) return 'Supabase не настроен'
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) return error.message
+    const email = useAuthStore.getState().user?.email
+    logAuthEvent('auth_password_changed', { email })
+    return null
+  },
+
+  resendConfirmation: async (email) => {
+    if (!supabase) return 'Supabase не настроен'
+    const { error } = await supabase.auth.resend({ type: 'signup', email })
+    return error ? error.message : null
   },
 
   fetchProfile: async () => {

@@ -11,7 +11,7 @@ import { useT } from '../lib/useT'
 import { useAuthStore } from '../store/authStore'
 import { createLocalBackup, restoreLocalBackup } from '../lib/localBackup'
 
-type SettingsTab = 'profile' | 'ai' | 'integrations' | 'system'
+type SettingsTab = 'profile' | 'ai' | 'integrations' | 'system' | 'security'
 
 const LANGUAGES: { value: AppLanguage; label: string; flag: string }[] = [
   { value: 'ru', label: 'Русский', flag: '🇷🇺' },
@@ -317,6 +317,96 @@ const UI = {
   },
 } as const
 
+// ---------------------------------------------------------------------------
+// Security tab i18n
+// ---------------------------------------------------------------------------
+const SEC_UI = {
+  ru: {
+    tabLabel: 'Безопасность',
+    loginMethod: 'Способ входа',
+    emailLogin: 'Вход по email',
+    googleLogin: (email: string) => `Вход через Google (${email})`,
+    changePassword: 'Сменить пароль',
+    currentPassword: 'Текущий пароль',
+    newPassword: 'Новый пароль',
+    confirmPassword: 'Подтвердите пароль',
+    savePassword: 'Сохранить',
+    savingPassword: 'Сохраняем…',
+    passwordSaved: '✓ Пароль изменён',
+    activeSessions: 'Активные сессии',
+    currentSession: 'Текущая сессия',
+    signOutAll: 'Выйти из всех устройств',
+    signingOut: 'Выходим…',
+    errShort: 'Пароль должен быть не менее 8 символов',
+    errMismatch: 'Пароли не совпадают',
+    errGeneric: 'Не удалось сменить пароль. Попробуйте ещё раз.',
+    errVerify: 'Неверный текущий пароль.',
+  },
+  uk: {
+    tabLabel: 'Безпека',
+    loginMethod: 'Спосіб входу',
+    emailLogin: 'Вхід по email',
+    googleLogin: (email: string) => `Вхід через Google (${email})`,
+    changePassword: 'Змінити пароль',
+    currentPassword: 'Поточний пароль',
+    newPassword: 'Новий пароль',
+    confirmPassword: 'Підтвердіть пароль',
+    savePassword: 'Зберегти',
+    savingPassword: 'Зберігаємо…',
+    passwordSaved: '✓ Пароль змінено',
+    activeSessions: 'Активні сесії',
+    currentSession: 'Поточна сесія',
+    signOutAll: 'Вийти з усіх пристроїв',
+    signingOut: 'Виходимо…',
+    errShort: 'Пароль має бути не менше 8 символів',
+    errMismatch: 'Паролі не збігаються',
+    errGeneric: 'Не вдалося змінити пароль. Спробуйте ще раз.',
+    errVerify: 'Невірний поточний пароль.',
+  },
+  en: {
+    tabLabel: 'Security',
+    loginMethod: 'Login method',
+    emailLogin: 'Email login',
+    googleLogin: (email: string) => `Google login (${email})`,
+    changePassword: 'Change password',
+    currentPassword: 'Current password',
+    newPassword: 'New password',
+    confirmPassword: 'Confirm password',
+    savePassword: 'Save',
+    savingPassword: 'Saving…',
+    passwordSaved: '✓ Password changed',
+    activeSessions: 'Active sessions',
+    currentSession: 'Current session',
+    signOutAll: 'Sign out from all devices',
+    signingOut: 'Signing out…',
+    errShort: 'Password must be at least 8 characters',
+    errMismatch: 'Passwords do not match',
+    errGeneric: 'Could not change password. Please try again.',
+    errVerify: 'Incorrect current password.',
+  },
+  bg: {
+    tabLabel: 'Сигурност',
+    loginMethod: 'Начин на вход',
+    emailLogin: 'Вход с email',
+    googleLogin: (email: string) => `Вход с Google (${email})`,
+    changePassword: 'Смяна на парола',
+    currentPassword: 'Текуща парола',
+    newPassword: 'Нова парола',
+    confirmPassword: 'Потвърдете паролата',
+    savePassword: 'Запази',
+    savingPassword: 'Запазваме…',
+    passwordSaved: '✓ Паролата е сменена',
+    activeSessions: 'Активни сесии',
+    currentSession: 'Текуща сесия',
+    signOutAll: 'Излез от всички устройства',
+    signingOut: 'Излизаме…',
+    errShort: 'Паролата трябва да е поне 8 символа',
+    errMismatch: 'Паролите не съвпадат',
+    errGeneric: 'Паролата не можа да се смени. Опитай отново.',
+    errVerify: 'Невалидна текуща парола.',
+  },
+} as const
+
 const inputStyle = {
   border: '1.5px solid var(--border)',
   backgroundColor: 'var(--surface)',
@@ -360,6 +450,7 @@ export default function Settings() {
     { id: 'profile',      label: t('tab_profile')      },
     { id: 'ai',           label: t('tab_ai')           },
     { id: 'integrations', label: t('tab_integrations') },
+    { id: 'security',     label: SEC_UI[store.language].tabLabel },
     { id: 'system',       label: t('tab_system')       },
   ]
 
@@ -820,6 +911,10 @@ export default function Settings() {
             </div>
           )}
 
+          {tab === 'security' && (
+            <SecurityTab />
+          )}
+
           {tab === 'system' && (
             <div className="space-y-4">
               <div style={cardStyle} className="space-y-3">
@@ -1005,6 +1100,206 @@ const VIEW_MODE_TEXTS = {
     accountantDesc: 'Пълен достъп: дневник, ОПР, баланс, отчети НАП, всички модули на приложението.',
   },
 } as const
+
+// ---------------------------------------------------------------------------
+// Security tab component
+// ---------------------------------------------------------------------------
+function SecurityTab() {
+  const [currentPwd,  setCurrentPwd]  = useState('')
+  const [newPwd,      setNewPwd]      = useState('')
+  const [confirmPwd,  setConfirmPwd]  = useState('')
+  const [saving,      setSaving]      = useState(false)
+  const [pwdSuccess,  setPwdSuccess]  = useState(false)
+  const [pwdError,    setPwdError]    = useState<string | null>(null)
+  const [signingOut,  setSigningOut]  = useState(false)
+
+  const language       = useUserStore((s) => s.language)
+  const updatePassword = useAuthStore((s) => s.updatePassword)
+  const signOutFn      = useAuthStore((s) => s.signOut)
+  const user           = useAuthStore((s) => s.user)
+  const session        = useAuthStore((s) => s.session)
+  const st = SEC_UI[language]
+
+  const isGoogleUser = user?.app_metadata?.provider === 'google'
+  const userEmail    = user?.email ?? ''
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPwdError(null)
+    if (newPwd.length < 8) { setPwdError(st.errShort); return }
+    if (newPwd !== confirmPwd) { setPwdError(st.errMismatch); return }
+
+    setSaving(true)
+    // Verify current password by re-signing in
+    const { supabase: sb } = await import('../lib/supabase')
+    if (sb) {
+      const { error: verifyErr } = await sb.auth.signInWithPassword({ email: userEmail, password: currentPwd })
+      if (verifyErr) { setSaving(false); setPwdError(st.errVerify); return }
+    }
+    const errMsg = await updatePassword(newPwd)
+    setSaving(false)
+    if (errMsg) {
+      setPwdError(st.errGeneric)
+    } else {
+      setPwdSuccess(true)
+      setCurrentPwd(''); setNewPwd(''); setConfirmPwd('')
+      setTimeout(() => setPwdSuccess(false), 3000)
+    }
+  }
+
+  const handleSignOutAll = async () => {
+    setSigningOut(true)
+    await signOutFn()
+  }
+
+  const signedInAt = session?.user?.last_sign_in_at
+    ? new Date(session.user.last_sign_in_at).toLocaleString(language === 'bg' ? 'bg-BG' : language === 'uk' ? 'uk-UA' : language === 'en' ? 'en-US' : 'ru-RU')
+    : null
+
+  return (
+    <div className="space-y-5">
+      {/* Login method */}
+      <div style={cardStyle}>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          {st.loginMethod}
+        </h2>
+        <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+          {isGoogleUser ? st.googleLogin(userEmail) : `${st.emailLogin}: ${userEmail}`}
+        </p>
+      </div>
+
+      {/* Change password — only for email users */}
+      {!isGoogleUser && (
+        <div style={cardStyle}>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            {st.changePassword}
+          </h2>
+          {pwdSuccess && (
+            <div className="mb-3 rounded-xl px-3 py-2 text-sm"
+              style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent-text)' }}>
+              {st.passwordSaved}
+            </div>
+          )}
+          <form onSubmit={handleChangePassword} noValidate className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs" style={{ color: 'var(--text-secondary)' }}>{st.currentPassword}</label>
+              <input
+                type="password"
+                value={currentPwd}
+                onChange={(e) => setCurrentPwd(e.target.value)}
+                autoComplete="current-password"
+                placeholder="••••••••"
+                style={inputStyle}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--accent)')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs" style={{ color: 'var(--text-secondary)' }}>{st.newPassword}</label>
+              <input
+                type="password"
+                value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)}
+                autoComplete="new-password"
+                placeholder="••••••••"
+                style={inputStyle}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--accent)')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
+              />
+              <PasswordStrengthInline password={newPwd} lang={language} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs" style={{ color: 'var(--text-secondary)' }}>{st.confirmPassword}</label>
+              <input
+                type="password"
+                value={confirmPwd}
+                onChange={(e) => setConfirmPwd(e.target.value)}
+                autoComplete="new-password"
+                placeholder="••••••••"
+                style={{
+                  ...inputStyle,
+                  borderColor: confirmPwd && confirmPwd !== newPwd ? 'var(--danger)' : 'var(--border)',
+                }}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--accent)')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
+              />
+            </div>
+            {pwdError && (
+              <div className="rounded-xl px-3 py-2 text-sm"
+                style={{ backgroundColor: 'var(--danger-light)', color: 'var(--danger-text)' }}>
+                {pwdError}
+              </div>
+            )}
+            <button
+              type="submit"
+              disabled={saving || !currentPwd || !newPwd || !confirmPwd}
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+              style={{ backgroundColor: 'var(--accent)' }}
+            >
+              {saving ? st.savingPassword : st.savePassword}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Active sessions */}
+      <div style={cardStyle}>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          {st.activeSessions}
+        </h2>
+        <div className="flex items-center justify-between rounded-xl p-3 mb-3"
+          style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              {st.currentSession}
+            </p>
+            {signedInAt && (
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{signedInAt}</p>
+            )}
+          </div>
+          <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">●</span>
+        </div>
+        <button
+          onClick={handleSignOutAll}
+          disabled={signingOut}
+          className="rounded-xl border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+          style={{ borderColor: 'var(--danger)', color: 'var(--danger)', backgroundColor: 'transparent' }}
+        >
+          {signingOut ? st.signingOut : st.signOutAll}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Inline password strength bar used inside SecurityTab
+function PasswordStrengthInline({ password, lang }: { password: string; lang: AppLanguage }) {
+  if (!password) return null
+  const strength =
+    password.length < 8 ? 1
+    : /[^a-zA-Zа-яА-Я0-9]/.test(password) && /\d/.test(password) ? 3
+    : /\d/.test(password) ? 2
+    : 1
+  const LABELS: Record<AppLanguage, [string, string, string]> = {
+    ru: ['Слабый', 'Средний', 'Сильный'],
+    uk: ['Слабкий', 'Середній', 'Сильний'],
+    en: ['Weak', 'Medium', 'Strong'],
+    bg: ['Слаба', 'Средна', 'Силна'],
+  }
+  const COLORS = ['#ef4444', '#f59e0b', '#22c55e']
+  const idx = strength - 1
+  return (
+    <div className="mt-1.5 space-y-1">
+      <div className="flex gap-1">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-1 flex-1 rounded-full transition-colors"
+            style={{ backgroundColor: i <= strength ? COLORS[idx] : 'var(--border)' }} />
+        ))}
+      </div>
+      <p className="text-xs" style={{ color: COLORS[idx] }}>{LABELS[lang][idx]}</p>
+    </div>
+  )
+}
 
 function ViewModeSection() {
   const viewMode = useUserStore((s) => s.viewMode)
