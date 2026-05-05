@@ -25,21 +25,19 @@ export default function AuthCallback() {
       return
     }
 
-    // Supabase automatically parses the URL hash/code and establishes
-    // the session. We just need to listen for SIGNED_IN.
+    // Supabase parses the URL hash/code and fires SIGNED_IN once session is ready.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
           await fetchProfile()
           navigate('/', { replace: true })
-        } else if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
-          setError(t.error)
         }
+        // Ignore all other events — the timeout handles the failure case
       },
     )
 
-    // Safety timeout — if auth doesn't fire within 10s, show error
-    const timeout = setTimeout(() => setError(t.error), 10_000)
+    // Safety timeout — if SIGNED_IN doesn't fire within 15s, show error
+    const timeout = setTimeout(() => setError(t.error), 15_000)
 
     return () => {
       subscription.unsubscribe()
